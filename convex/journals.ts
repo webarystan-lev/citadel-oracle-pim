@@ -1,14 +1,12 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 
-// Получение списка всех записей журнала
 export const listJournals = query({
     handler: async (ctx) => {
         return await ctx.db.query("journals").order("desc").take(100);
     },
 });
 
-// Добавление новой записи в журнал
 export const createJournal = mutation({
     args: {
         id: v.string(),
@@ -35,7 +33,6 @@ export const createJournal = mutation({
     },
 });
 
-// Обновление записи в журнале
 export const updateJournal = mutation({
     args: {
         id: v.string(),
@@ -65,7 +62,6 @@ export const updateJournal = mutation({
     },
 });
 
-// Удаление записи журнала
 export const deleteJournal = mutation({
     args: { id: v.string() },
     handler: async (ctx, args) => {

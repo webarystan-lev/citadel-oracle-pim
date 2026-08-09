@@ -408,10 +408,8 @@ if active_tab == "💬 ИИ-Чат & Оракул":
     if prompt := st.chat_input("Спросите Оракула или запросите анализ PIM..."):
         user_msg = {"role": "user", "content": prompt}
         chat["messages"].append(user_msg)
-        if bridge.is_active:
-            bridge.add_message(current_id, user_msg)
-            
-        # Автоматическая генерация названия чата по первому запросу пользователя
+        
+        # 1. Автоматическая генерация названия чата по первому запросу пользователя
         current_title = chat.get("title", "")
         user_msg_count = len([m for m in chat.get("messages", []) if m["role"] == "user"])
         is_default_title = (
@@ -425,9 +423,11 @@ if active_tab == "💬 ИИ-Чат & Оракул":
             short_text = clean_text[:35] + ("..." if len(clean_text) > 35 else "")
             auto_title = f"💬 {short_text}"
             chat["title"] = auto_title
-            if bridge.is_active:
-                bridge.rename_chat(current_id, auto_title)
-            st.rerun()
+            
+        # 2. Сохраняем параметры чата и сообщение в Convex DB
+        if bridge.is_active:
+            bridge.save_chat(current_id, chat)
+            bridge.add_message(current_id, user_msg)
             
         with st.chat_message("user", avatar="👤"):
             st.markdown(prompt)
