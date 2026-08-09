@@ -1,0 +1,14 @@
+{
+  "name": "citadel-oracle-pim",
+  "version": "1.0.0",
+  "description": "Citadel Oracle PIM - Personal Information Manager & Knowledge Hub",
+  "main": "index.js",
+  "scripts": {
+    "convex:dev": "npx convex dev",
+    "dev": "streamlit run app.py"
+  },
+  "dependencies": {
+    "convex": "^1.42.1"
+  },
+  "private": true
+}

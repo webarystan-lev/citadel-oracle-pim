@@ -1,0 +1,71 @@
+# ==============================================================================
+# СВЯЩЕННЫЕ ГРАНИЦЫ РЕПОЗИТОРИЯ ЦИТАДЕЛИ (ПРОЕКТ STREAMLIT / PYTHON / AI AGENTS)
+# ==============================================================================
+
+# ─── ЛОКАЛЬНОЕ ОКРУЖЕНИЕ И ПЕРЕМЕННЫЕ (ВАШ КОРЕНЬ) ────────────────────────────
+.direnv
+.venv
+venv/
+env/
+.env
+.envrc
+*.env
+*.env.*
+.secrets
+
+# ─── СИСТЕМНЫЙ МУСОР PYTHON & STREAMLIT ───────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.streamlit/config.toml
+
+# ─── ИНСТРУМЕНТЫ ИИ-РАЗРАБОТКИ И АВТОНОМНЫЕ АГЕНТЫ (AIDER, DEVIN, QWEN, ETC.) ─
+# Aider AI (Логи чатов, настройки и локальная история изменений)
+.aider*
+!.aider.conf.yml
+aider.log
+
+# Windsurf & Cascade (Локальный кэш контекста, индексы и истории промптов)
+.windsurf/
+.codeium/
+
+# Devin AI & Автономные Vibe-агенты (Временные логи запусков и снапшоты)
+.devin/
+.vibe/
+vibe.log
+.antigravity/
+antigravity.log
+
+# Qwen Code & Локальные LLM-ассистенты (Кэш эмбеддингов и локальной индексации)
+.qwen/
+.qwen-code/
+.llm-context/
+.copilot/
+
+# ─── СОВРЕМЕННЫЕ РЕДАКТОРЫ И IDE (VS CODE, WEBSTORM / JETBRAINS) ──────────────
+# Visual Studio Code & Windsurf Base
+.vscode/
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/tasks.json
+*.code-workspace
+
+# WebStorm / JetBrains IDE (Служебная папка настроек проекта и индексов поиска)
+.idea/
+*.iws
+*.iml
+# ─── ОПЕРАЦИОННЫЕ СИСТЕМЫ И СИСТЕМНЫЙ МУСОР ───────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+# ─── CONVEX & NODEJS (БЭКЕНД СИНХРОНИЗАЦИИ) ───────────────────────────────────
+node_modules/
+.convex/
+convex/_generated/
+package-lock.json
+
+
+.env.local
