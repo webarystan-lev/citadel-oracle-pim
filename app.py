@@ -411,6 +411,24 @@ if active_tab == "💬 ИИ-Чат & Оракул":
         if bridge.is_active:
             bridge.add_message(current_id, user_msg)
             
+        # Автоматическая генерация названия чата по первому запросу пользователя
+        current_title = chat.get("title", "")
+        user_msg_count = len([m for m in chat.get("messages", []) if m["role"] == "user"])
+        is_default_title = (
+            current_title.startswith("🏛️ Диалог") or 
+            current_title.startswith("🏛️ Новый") or 
+            current_title.startswith("Диалог") or 
+            current_title == "🏛️ Главный Оракул"
+        )
+        if is_default_title and user_msg_count == 1:
+            clean_text = prompt.strip().replace("\n", " ")
+            short_text = clean_text[:35] + ("..." if len(clean_text) > 35 else "")
+            auto_title = f"💬 {short_text}"
+            chat["title"] = auto_title
+            if bridge.is_active:
+                bridge.rename_chat(current_id, auto_title)
+            st.rerun()
+            
         with st.chat_message("user", avatar="👤"):
             st.markdown(prompt)
             
