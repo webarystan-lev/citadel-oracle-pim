@@ -85,10 +85,65 @@ CITADEL_SIGNATURES = {
         "purpose": "Персональный Оракул & Архитектор Знаний",
         "rank": "Верховный Страж Мудрости Цитадели"
     },
-    "gemini-1.5-pro": {
-        "title": "Google Gemini 1.5 Pro",
+    "gemini-2.5-pro": {
+        "title": "Google Gemini 2.5 Pro",
         "purpose": "Теологический Исследователь & Глубокий Аналитик",
         "rank": "Старший ИИ-Архитектор Shekinah Cloud"
+    },
+    "gemini-2.5-flash-lite": {
+        "title": "Google Gemini 2.5 Flash Lite",
+        "purpose": "Послушник Цифрового Логоса",
+        "rank": "Младший Страж Мысли"
+    },
+    "gemini-3.5-flash": {
+        "title": "Google Gemini 3.5 Flash",
+        "purpose": "Оракул Нового Поколения",
+        "rank": "Архивариус Небесных Сфер"
+    },
+    "gemini-3.6-flash": {
+        "title": "Google Gemini 3.6 Flash",
+        "purpose": "Верховный Академический Соратник",
+        "rank": "Магистр Вселенского Логоса"
+    },
+    "gemini-3-flash-preview": {
+        "title": "Google Gemini 3 Flash Preview",
+        "purpose": "Провидец Будущих Истин",
+        "rank": "Исследователь Глубоких Сфер"
+    },
+    "gemini-3.1-flash-lite": {
+        "title": "Google Gemini 3.1 Flash Lite",
+        "purpose": "Хранитель Малого Логоса",
+        "rank": "Вестник Быстрого Разума"
+    },
+    "gemma-4-31b-it": {
+        "title": "Gemma 4 31B IT",
+        "purpose": "Магистр Открытого Знания",
+        "rank": "Хранитель Открытого Кода"
+    },
+    "claude-opus-5": {
+        "title": "Anthropic Claude Opus 5",
+        "purpose": "Высший Первосвященник Интеллекта",
+        "rank": "Верховный Философ Цитадели"
+    },
+    "claude-sonnet-5": {
+        "title": "Anthropic Claude Sonnet 5",
+        "purpose": "Архитектор Высшего Разума",
+        "rank": "Магистр Вселенской Мысли"
+    },
+    "claude-fable-5": {
+        "title": "Anthropic Claude Fable 5",
+        "purpose": "Магистр Творческого Логоса",
+        "rank": "Страж Художественного Познания"
+    },
+    "claude-opus-4-8": {
+        "title": "Anthropic Claude Opus 4.8",
+        "purpose": "Верховный Аналитик & Теолог",
+        "rank": "Первосвященник Разума"
+    },
+    "claude-opus-4-7": {
+        "title": "Anthropic Claude Opus 4.7",
+        "purpose": "Глубокий Рассуждающий Стратег",
+        "rank": "Старший ИИ-Философ"
     },
     "claude-sonnet-4-6": {
         "title": "Anthropic Claude Sonnet 4.6",
@@ -98,25 +153,110 @@ CITADEL_SIGNATURES = {
     "claude-opus-4-6": {
         "title": "Anthropic Claude Opus 4.6",
         "purpose": "Глубокий Рассуждающий Оракул",
-        "rank": "Верховный Философ Цитадели"
+        "rank": "Советник Высшего Разума"
     },
     "claude-haiku-4-5-20251001": {
         "title": "Anthropic Claude Haiku 4.5",
         "purpose": "Оперативный Быстрый Вестник",
         "rank": "Страж Мгновенных Ответов"
     },
+    "claude-sonnet-4-5-20250929": {
+        "title": "Anthropic Claude Sonnet 4.5",
+        "purpose": "Хранитель Глубинных Смыслов",
+        "rank": "Архивариус Духовного Кодекса"
+    },
+    "claude-3-5-sonnet-20240620": {
+        "title": "Anthropic Claude 3.5 Sonnet",
+        "purpose": "Классический Скриптор Мудрости",
+        "rank": "Летописец Цитадели"
+    },
     "mistral-large-latest": {
         "title": "Mistral AI Large",
         "purpose": "Европейский Оракул & Стратег",
         "rank": "Советник Шехина Цитадели"
+    },
+    "mistral-large-2512": {
+        "title": "Mistral Large 2512",
+        "purpose": "Флагманский Европейский Разум",
+        "rank": "Иерофант Нового Века"
+    },
+    "mistral-medium-latest": {
+        "title": "Mistral Medium Latest",
+        "purpose": "Сбалансированная Мудрость",
+        "rank": "Мастер Гармонии"
+    },
+    "mistral-small-latest": {
+        "title": "Mistral Small Latest",
+        "purpose": "Быстрый Оперативный Аналитик",
+        "rank": "Странник Междумирья"
+    },
+    "codestral-latest": {
+        "title": "Mistral Codestral",
+        "purpose": "Высшая Разработка & Алгоритмы",
+        "rank": "Зодчий Цифровых Структур"
+    },
+    "devstral-latest": {
+        "title": "Mistral Devstral",
+        "purpose": "Агентский Инжиниринг Кода",
+        "rank": "Архитектор Автономных Действий"
+    },
+    "mistral-code-agent-latest": {
+        "title": "Mistral Code Agent",
+        "purpose": "Инженер Чистого Синтаксиса",
+        "rank": "Хранитель Кодового Порядка"
     }
 }
 
-DEFAULT_MODELS = {
-    "Google Gemini": ["gemini-2.5-flash", "gemini-1.5-pro", "gemini-2.0-flash-exp"],
-    "Anthropic Claude": ["claude-sonnet-4-6", "claude-opus-4-6", "claude-haiku-4-5-20251001"],
-    "Mistral AI": ["mistral-large-latest", "pixtral-large-latest", "open-mistral-7b"]
+DEFAULT_GEMINI_MODELS = {
+    "gemini-2.5-flash": "Gemini 2.5 Flash (Рекомендуемая)",
+    "gemini-2.5-pro": "Gemini 2.5 Pro (Верховный ИИ-Архитектор)",
+    "gemini-2.5-flash-lite": "Gemini 2.5 Flash Lite (Оптимизированная)",
+    "gemini-3.5-flash": "Gemini 3.5 Flash (Новое поколение)",
+    "gemini-3.6-flash": "Gemini 3.6 Flash (Академический Соратник)",
+    "gemini-3-flash-preview": "Gemini 3 Flash Preview (Экспериментальная)",
+    "gemini-3.1-flash-lite": "Gemini 3.1 Flash Lite (Хранитель Малого Логоса)",
+    "gemma-4-31b-it": "Gemma 4 31B IT (Google Open Model)"
 }
+
+DEFAULT_ANTHROPIC_MODELS = {
+    "claude-opus-5": "Claude Opus 5 (Высший разум)",
+    "claude-sonnet-5": "Claude Sonnet 5 (Архитектор мысли)",
+    "claude-fable-5": "Claude Fable 5 (Магистр Творчества)",
+    "claude-opus-4-8": "Claude Opus 4.8 (Верховный аналитик)",
+    "claude-opus-4-7": "Claude Opus 4.7 (Первосвященник)",
+    "claude-sonnet-4-6": "Claude Sonnet 4.6 (Премиум баланс)",
+    "claude-opus-4-6": "Claude Opus 4.6 (Глубокий Оракул)",
+    "claude-haiku-4-5-20251001": "Claude Haiku 4.5 (Молниеносная)",
+    "claude-sonnet-4-5-20250929": "Claude Sonnet 4.5 (Глубокий контекст)",
+    "claude-3-5-sonnet-20240620": "Claude 3.5 Sonnet (Классическая)"
+}
+
+DEFAULT_MISTRAL_MODELS = {
+    "mistral-large-latest": "Mistral Large Latest (Верховный европейский флагман)",
+    "mistral-large-2512": "Mistral Large 2512 (Флагманский разум)",
+    "mistral-medium-latest": "Mistral Medium Latest (Мастер Гармонии)",
+    "mistral-small-latest": "Mistral Small Latest (Странник Междумирья)",
+    "codestral-latest": "Codestral Latest (Зодчий Цифровых Структур)",
+    "devstral-latest": "Devstral Latest (Архитектор Автономных Действий)",
+    "mistral-code-agent-latest": "Mistral Code Agent (Инженер кода)",
+    "ministral-8b-latest": "Ministral 8B Latest (Компактный Мудрец)",
+    "ministral-14b-latest": "Ministral 14B Latest (Оптимальный Страж)"
+}
+
+def fetch_gemini_models() -> list:
+    if "gemini_models" not in st.session_state or st.session_state.gemini_models is None:
+        st.session_state.gemini_models = gemini_client.list_available_gemini_models()
+    return st.session_state.gemini_models
+
+def fetch_anthropic_models() -> list:
+    if "anthropic_models" not in st.session_state or st.session_state.anthropic_models is None:
+        st.session_state.anthropic_models = anthropic_client.list_available_anthropic_models()
+    return st.session_state.anthropic_models
+
+def fetch_mistral_models() -> list:
+    if "mistral_models" not in st.session_state or st.session_state.mistral_models is None:
+        st.session_state.mistral_models = mistral_client.list_available_mistral_models()
+    return st.session_state.mistral_models
 
 DEFAULT_SYSTEM = (
     "Ты — Ведущий ИИ-Архитектор и Персональный Оракул Цитадели «Shekinah Cloud». "
@@ -326,12 +466,60 @@ with st.sidebar:
         )
         chat["provider"] = new_prov
         
-        # 2. Модель
-        avail_models = DEFAULT_MODELS.get(new_prov, ["gemini-2.5-flash"])
-        curr_model = chat.get("model", avail_models[0])
-        model_index = avail_models.index(curr_model) if curr_model in avail_models else 0
+        # 2. Модель (Динамический запрос / Фолбэк)
+        model_options = {}
+        if new_prov == "Google Gemini":
+            dynamic_list = fetch_gemini_models()
+            if dynamic_list:
+                for m in dynamic_list:
+                    if m in DEFAULT_GEMINI_MODELS:
+                        model_options[m] = DEFAULT_GEMINI_MODELS[m]
+                    else:
+                        friendly = m.replace("models/", "").replace("-", " ").title()
+                        rank = CITADEL_SIGNATURES.get(m, {}).get("rank", "Новопосвященная модель")
+                        model_options[m] = f"✨ {friendly} ({rank})"
+            for k, v in DEFAULT_GEMINI_MODELS.items():
+                if k not in model_options:
+                    model_options[k] = v
+
+        elif new_prov == "Anthropic Claude":
+            dynamic_list = fetch_anthropic_models()
+            if dynamic_list:
+                for m in dynamic_list:
+                    if m in DEFAULT_ANTHROPIC_MODELS:
+                        model_options[m] = DEFAULT_ANTHROPIC_MODELS[m]
+                    else:
+                        friendly = m.replace("-", " ").title()
+                        rank = CITADEL_SIGNATURES.get(m, {}).get("rank", "Новопосвященная модель")
+                        model_options[m] = f"✨ {friendly} ({rank})"
+            for k, v in DEFAULT_ANTHROPIC_MODELS.items():
+                if k not in model_options:
+                    model_options[k] = v
+
+        elif new_prov == "Mistral AI":
+            dynamic_list = fetch_mistral_models()
+            if dynamic_list:
+                for m in dynamic_list:
+                    if m in DEFAULT_MISTRAL_MODELS:
+                        model_options[m] = DEFAULT_MISTRAL_MODELS[m]
+                    else:
+                        friendly = m.replace("-", " ").title()
+                        rank = CITADEL_SIGNATURES.get(m, {}).get("rank", "Новопосвященная модель")
+                        model_options[m] = f"✨ {friendly} ({rank})"
+            for k, v in DEFAULT_MISTRAL_MODELS.items():
+                if k not in model_options:
+                    model_options[k] = v
+
+        avail_model_keys = list(model_options.keys())
+        curr_model = chat.get("model", avail_model_keys[0])
+        model_index = avail_model_keys.index(curr_model) if curr_model in avail_model_keys else 0
         
-        new_model = st.selectbox("Модель ИИ", avail_models, index=model_index)
+        new_model = st.selectbox(
+            "Модель ИИ",
+            avail_model_keys,
+            index=model_index,
+            format_func=lambda x: model_options.get(x, x)
+        )
         chat["model"] = new_model
         
         # 3. Название диалога

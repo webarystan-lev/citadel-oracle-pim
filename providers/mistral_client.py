@@ -65,7 +65,7 @@ def stream_mistral(messages: List[Dict[str, str]], model_name: str, temperature:
 
 def list_available_mistral_models() -> List[str]:
     """
-    Получает список доступных моделей от Mistral API.
+    Получает список доступных текстовых моделей от Mistral API.
     """
     api_key = os.getenv("MISTRAL_API_KEY")
     if not api_key:
@@ -74,6 +74,10 @@ def list_available_mistral_models() -> List[str]:
         from mistralai.client import Mistral
         client = Mistral(api_key=api_key)
         models_list = client.models.list()
-        return [m.id for m in models_list.data]
+        ignored_keywords = ["embed", "ocr", "moderation", "tts", "transcribe", "realtime"]
+        return [
+            m.id for m in models_list.data 
+            if hasattr(m, 'id') and not any(k in m.id for k in ignored_keywords)
+        ]
     except Exception:
         return []

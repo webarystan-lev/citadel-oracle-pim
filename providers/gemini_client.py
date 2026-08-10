@@ -90,16 +90,17 @@ def list_available_gemini_models() -> List[str]:
     """
     Получает список доступных моделей от Google Gemini API.
     """
-    api_key = os.getenv("GEMINI_API_KEY")
+    api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
     if not api_key:
         return []
     try:
         client = genai.Client(api_key=api_key)
         models = client.models.list()
-        return [
-            m.name.replace("models/", "") 
-            for m in models 
-            if m.supported_generation_methods and "generateContent" in m.supported_generation_methods
-        ]
+        res = []
+        for m in models:
+            actions = getattr(m, 'supported_actions', None) or getattr(m, 'supported_generation_methods', None) or []
+            if "generateContent" in actions:
+                res.append(m.name.replace("models/", ""))
+        return res
     except Exception:
         return []
