@@ -1,35 +1,44 @@
-# 📊 STATUS_PROJECT.md — Текущий Статус Проекта Citadel Oracle PIM
+# 📊 STATUS_PROJECT.md — Свиток Состояния Проекта Citadel Oracle PIM
 
-> **Дата фиксации**: 10 Августа 2026 г.
-> **Состояние**: Релизный патч v1.0.0 готов к первому коммиту в GitHub.
+> **Дата Точки Останова (Breakpoint)**: 10 Августа 2026 г.
+> **Состояние**: Релиз v1.0.0 успешно развернут, синхронизирован с Convex DB и отправлен в GitHub.
 
 ---
 
-## 🏛️ Выполненные Задачи:
+## 🏛️ Достижения Сессии:
 
-1. **Ребрендинг и Структура**:
-   * Проект полностью преобразован в **Citadel Oracle PIM** (`citadel-oracle-pim`).
-   * Очищены временные и устаревшие резервные файлы.
+1. **Трансформация в Citadel Oracle PIM**:
+   * Проект полностью отделен и преобразован в суверенный PIM-органайзер.
+   * Полный комплект свитков документации: `README.md`, `DEVELOPMENT.md`, `AGENTS.md`, `GEMINI.md`, `STATUS_PROJECT.md`.
 
-2. **Модули PIM в `app.py`**:
-   * **💬 ИИ-Чат & Оракул**: Нативные стриминг-клиенты Google Gemini, Anthropic Claude (`claude-sonnet-4-6`), Mistral AI.
-   * **📖 Журнал**: Дневниковые записи, духовные вопросы рефлексии от Gemini, ИИ-синтез.
-   * **📁 Проекты**: Управление карточками проектов, статусы, цели и milestones.
+2. **5 Модулей PIM в `app.py`**:
+   * **💬 ИИ-Чат & Персональный Оракул**: Потоковый вызов Google Gemini (`gemini-2.5-flash`), Anthropic Claude (`claude-sonnet-4-6`), Mistral AI (`mistral-large-latest`).
+   * **📖 Ежедневный Журнал**: Дневник, ИИ-вопросы для вечерней рефлексии в стиле Journal with Gemini.
+   * **📁 Проекты**: Карточки проектов, статусы, категории и milestones.
    * **📝 Заметки**: Категоризированная база знаний в формате Markdown.
-   * **🔐 Сейф Паролей и Ключей**: Сквозное шифрование AES-256 (Fernet) с мастер-паролем `PIM_SECRET_KEY` и раскрытием по клику `👁️`.
+   * **🔐 Сейф Паролей и Ключей**: Сквозное шифрование **AES-256 (Fernet)** с раскрытием по тумблеру `👁️`.
 
-3. **Безопасность**:
-   * Двухуровневый экран авторизации (Gatekeeper).
-   * Живая валидация `GEMINI_API_KEY` через вызов `genai.list_models()`.
+3. **Безопасность и Валидация**:
+   * Двухуровневый экран входа (Gatekeeper) по `PIM_SECRET_KEY` + живой вызов `genai.list_models()` для проверки `GEMINI_API_KEY`.
 
 4. **Бэкенд Convex DB**:
-   * Обновлена схема `convex/schema.ts` (`chats`, `messages`, `journals`, `projects`, `notes`, `vault`).
-   * Написаны TypeScript-обработчики в `convex/` и Python-клиент `ConvexBridge` в `providers/convex_client.py`.
+   * Схема `convex/schema.ts` и все 6 TypeScript-обработчиков (`chats`, `messages`, `journals`, `projects`, `notes`, `vault`) **успешно развернуты** в облаке Convex (`https://tough-butterfly-16.eu-west-1.convex.cloud/`).
+   * Проведена верификация: связь `check_connection: True`, история диалогов и сообщения сохраняются и загружаются после входа.
 
 5. **Интеграция Antigravity 2.0 & IDE**:
-   * Развернуты правила `.agents/rules/oracle-pim.md` и навык `.agents/skills/oracle-pim/SKILL.md`.
+   * Настроены правила `.agents/rules/oracle-pim.md` и навык `.agents/skills/oracle-pim/SKILL.md`.
+
+6. **Сигнатура Ордена**:
+   * В конце ответа каждой модели проставляется каноническая подпись **Shekinah Citadel Oracle Spirit**.
+
+7. **Git & GitHub**:
+   * Первый коммит отправлен в репозиторий `https://github.com/webarystan-lev/citadel-oracle-pim.git`.
 
 ---
 
-## 🎯 Точка Назначения
-* **Репозиторий GitHub**: `https://github.com/webarystan-lev/citadel-oracle-pim`
+## 📋 План на Следующую Сессию (To-Do List):
+
+1. **Доработка авто-переименования диалогов**:
+   * Усовершенствовать логику авто-заголовка, чтобы при первом вопросе название чата мгновенно обновлялось с по тексту запроса вместо номера.
+2. **Поэтапное тестирование модулей**:
+   * Проверка сохранения и взаимодействия Журнала, Проектов, Заметок и Зашифрованного Сейфа.
