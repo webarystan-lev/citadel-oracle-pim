@@ -65,6 +65,46 @@ CITADEL_CSS = """
         font-size: 2.2rem;
         margin-bottom: 0.5rem;
     }
+
+    /* Shimmering Word Animations */
+    @keyframes word-shimmer {
+        0% { filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.5)); background-position: 0% 50%; }
+        33% { filter: drop-shadow(0 0 12px rgba(192, 132, 252, 0.6)); background-position: 50% 50%; }
+        66% { filter: drop-shadow(0 0 10px rgba(251, 191, 36, 0.6)); background-position: 100% 50%; }
+        100% { filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.5)); background-position: 0% 50%; }
+    }
+
+    .word-citadel {
+        background: linear-gradient(135deg, #38bdf8, #818cf8, #3b82f6);
+        background-size: 200% 200%;
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        animation: word-shimmer 4s ease-in-out infinite;
+        font-weight: 800;
+        display: inline-block;
+    }
+
+    .word-oracle {
+        background: linear-gradient(135deg, #c084fc, #e879f9, #a855f7);
+        background-size: 200% 200%;
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        animation: word-shimmer 4s ease-in-out infinite;
+        animation-delay: 1.3s;
+        font-weight: 800;
+        display: inline-block;
+    }
+
+    .word-pim {
+        background: linear-gradient(135deg, #fbbf24, #f59e0b, #f97316);
+        background-size: 200% 200%;
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        animation: word-shimmer 4s ease-in-out infinite;
+        animation-delay: 2.6s;
+        font-weight: 800;
+        display: inline-block;
+    }
     
     .badge-active { background-color: #065f46; color: #34d399; padding: 4px 10px; border-radius: 12px; font-size: 0.8rem; font-weight: 600; }
     .badge-planning { background-color: #1e3a8a; color: #93c5fd; padding: 4px 10px; border-radius: 12px; font-size: 0.8rem; font-weight: 600; }
@@ -529,10 +569,19 @@ if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 
 def render_login_screen():
-    st.markdown("<div style='text-align: center; padding-top: 50px;'>", unsafe_allow_html=True)
-    st.markdown("<h1 class='citadel-header'>🏛️ CITADEL ORACLE PIM</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='color: #94a3b8; font-size: 1.1rem;'>Вход в Персональный Интеллектуальный Органайзер Цитадели Духа</p>", unsafe_allow_html=True)
-    st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown("""
+    <div style='text-align: center; margin-top: 30px; margin-bottom: 25px; width: 100%;'>
+        <h1 style='font-size: 2.5rem; text-align: center; margin-bottom: 12px; font-weight: 800; letter-spacing: 1px;'>
+            <span>🏛️</span> 
+            <span class="word-citadel">CITADEL</span> 
+            <span class="word-oracle">ORACLE</span> 
+            <span class="word-pim">PIM</span>
+        </h1>
+        <p style='text-align: center; color: #94a3b8; font-size: 1.15rem; font-weight: 500; margin: 0 auto; max-width: 650px; line-height: 1.5;'>
+            Вход в Персональный Интеллектуальный Органайзер Цитадели Духа
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
     
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
@@ -788,7 +837,17 @@ if active_tab == "💬 ИИ-Чат & Оракул":
     # 📍 Якорь начала чата
     st.markdown("<div id='chat-top-anchor'></div>", unsafe_allow_html=True)
     
-    st.markdown("<h2 class='citadel-header'>💬 ИИ-Чат & Персональный Оракул</h2>", unsafe_allow_html=True)
+    st.markdown("""
+    <div style='text-align: center; margin-top: 10px; margin-bottom: 20px; width: 100%;'>
+        <h2 style='font-size: 2.2rem; text-align: center; font-weight: 800; letter-spacing: 0.5px; margin-bottom: 8px;'>
+            <span>💬</span> 
+            <span class="word-citadel">ИИ-Чат</span> 
+            <span style="color: #94a3b8; font-weight: 600;">&</span> 
+            <span class="word-oracle">Персональный</span> 
+            <span class="word-pim">Оракул</span>
+        </h2>
+    </div>
+    """, unsafe_allow_html=True)
     
     # 1. Нативные плавающие кнопки скроллинга (работают напрямую в основном DOM без iframe)
     st.markdown("""
