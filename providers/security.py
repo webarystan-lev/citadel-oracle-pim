@@ -1,7 +1,8 @@
 import base64
 import hashlib
 import logging
-import google.generativeai as genai
+import os
+from google import genai
 from cryptography.fernet import Fernet
 
 logger = logging.getLogger("PIMSecurity")
@@ -39,16 +40,16 @@ def decrypt_secret(encrypted_text: str, secret_passphrase: str) -> str:
 
 def verify_gemini_api_key(api_key: str) -> tuple[bool, str]:
     """
-    Проверяет валидность GEMINI_API_KEY путём официального вызова genai.list_models().
+    Проверяет валидность GEMINI_API_KEY путём официального вызова client.models.list() (новый SDK google-genai).
     Возвращает (True, "Успешно") или (False, "Сообщение об ошибке").
     """
     if not api_key or len(api_key.strip()) < 10:
         return False, "Ключ GEMINI_API_KEY слишком короткий или отсутствует."
     
     try:
-        genai.configure(api_key=api_key.strip())
-        # Делаем минимальный вызов списка моделей для проверки действительности ключа
-        models = list(genai.list_models())
+        client = genai.Client(api_key=api_key.strip())
+        # Делаем минимальный вызов списка моделей через современный клиент
+        models = list(client.models.list())
         if models and len(models) > 0:
             return True, f"Ключ подлинный. Доступно моделей Google Gemini: {len(models)}"
         return False, "Не удалось получить список моделей Google."
