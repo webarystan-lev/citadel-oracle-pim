@@ -4,6 +4,8 @@ import importlib
 import uuid
 import time
 import json
+import html
+import base64
 from dotenv import load_dotenv
 
 # Загружаем переменные окружения
@@ -74,9 +76,191 @@ CITADEL_CSS = """
         font-weight: 600;
         transition: all 0.3s ease;
     }
+    
+    html, body, [data-testid="stMain"], section.main, .stApp {
+        scroll-behavior: smooth !important;
+    }
+    
+    /* Floating Scroll Buttons */
+    .scroll-nav-box {
+        position: fixed;
+        bottom: 85px;
+        right: 25px;
+        z-index: 999999;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        pointer-events: auto !important;
+    }
+    .scroll-nav-btn {
+        background: rgba(17, 24, 39, 0.92) !important;
+        border: 1px solid rgba(96, 165, 250, 0.4) !important;
+        color: #f8fafc !important;
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        font-size: 22px;
+        cursor: pointer !important;
+        box-shadow: 0 6px 22px rgba(0, 0, 0, 0.6);
+        backdrop-filter: blur(12px);
+        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-decoration: none !important;
+        user-select: none;
+    }
+    .scroll-nav-btn:hover {
+        background: linear-gradient(135deg, #3b82f6, #9333ea) !important;
+        color: #ffffff !important;
+        transform: translateY(-3px) scale(1.15);
+        box-shadow: 0 10px 30px rgba(59, 130, 246, 0.7);
+        text-decoration: none !important;
+    }
+    .scroll-nav-pill {
+        background: rgba(30, 41, 59, 0.85) !important;
+        border: 1px solid rgba(96, 165, 250, 0.35) !important;
+        color: #93c5fd !important;
+        padding: 6px 14px;
+        border-radius: 8px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        text-decoration: none !important;
+        transition: all 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .scroll-nav-pill:hover {
+        background: #2563eb !important;
+        color: #ffffff !important;
+        text-decoration: none !important;
+        transform: translateY(-1px);
+    }
+
+    /* Copy Button Styling */
+    .citadel-copy-wrapper {
+        margin-top: 6px;
+        margin-bottom: 6px;
+        display: flex;
+        justify-content: flex-start;
+    }
+    .citadel-copy-btn {
+        background: rgba(30, 41, 59, 0.75) !important;
+        border: 1px solid rgba(147, 51, 234, 0.4) !important;
+        color: #c084fc !important;
+        padding: 5px 12px !important;
+        border-radius: 6px !important;
+        font-size: 0.8rem !important;
+        font-weight: 500 !important;
+        cursor: pointer !important;
+        transition: all 0.2s ease !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 6px !important;
+        backdrop-filter: blur(8px) !important;
+        text-decoration: none !important;
+        outline: none !important;
+    }
+    .citadel-copy-btn:hover {
+        background: rgba(147, 51, 234, 0.4) !important;
+        color: #ffffff !important;
+        border-color: rgba(192, 132, 252, 0.7) !important;
+        transform: translateY(-1px) !important;
+        box-shadow: 0 4px 14px rgba(147, 51, 234, 0.35) !important;
+    }
+
+    /* Animated Thinking Indicator */
+    @keyframes pulse-brain {
+        0% { transform: scale(1); opacity: 0.8; filter: drop-shadow(0 0 4px #3b82f6); }
+        50% { transform: scale(1.25); opacity: 1; filter: drop-shadow(0 0 16px #9333ea); }
+        100% { transform: scale(1); opacity: 0.8; filter: drop-shadow(0 0 4px #3b82f6); }
+    }
+    .thinking-animated-box {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 18px;
+        border-radius: 20px;
+        background: rgba(30, 41, 59, 0.75);
+        border: 1px solid rgba(147, 51, 234, 0.4);
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        margin-bottom: 12px;
+        backdrop-filter: blur(10px);
+    }
+    .thinking-icon {
+        font-size: 1.5rem;
+        display: inline-block;
+        animation: pulse-brain 1.8s infinite ease-in-out;
+    }
+    .thinking-text {
+        font-weight: 600;
+        background: linear-gradient(90deg, #60a5fa, #c084fc);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        font-size: 0.98rem;
+    }
+    .thinking-timer {
+        color: #94a3b8;
+        font-family: monospace;
+        font-size: 0.92rem;
+        background: rgba(15, 23, 42, 0.6);
+        padding: 2px 8px;
+        border-radius: 8px;
+    }
 </style>
 """
 st.markdown(CITADEL_CSS, unsafe_allow_html=True)
+
+# Глобальный JS-скрипт копирования в буфер обмена
+st.components.v1.html("""
+<script>
+if (window.parent && !window.parent.citadelCopyB64) {
+    window.parent.citadelCopyB64 = function(btn, b64) {
+        try {
+            var bin = atob(b64);
+            var bytes = new Uint8Array(bin.length);
+            for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+            var txt = new TextDecoder('utf-8').decode(bytes);
+            
+            var ta = window.parent.document.createElement('textarea');
+            ta.value = txt;
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            ta.style.pointerEvents = 'none';
+            window.parent.document.body.appendChild(ta);
+            ta.focus();
+            ta.select();
+            var ok = false;
+            try { ok = window.parent.document.execCommand('copy'); } catch(e){ ok = false; }
+            window.parent.document.body.removeChild(ta);
+            
+            if (!ok && window.parent.navigator.clipboard) {
+                window.parent.navigator.clipboard.writeText(txt);
+                ok = true;
+            }
+            
+            if (btn) {
+                var orig = btn.innerHTML;
+                btn.innerHTML = '✅ Скопировано в буфер!';
+                btn.style.color = '#34d399';
+                btn.style.borderColor = '#34d399';
+                setTimeout(function(){
+                    btn.innerHTML = orig;
+                    btn.style.color = '';
+                    btn.style.borderColor = '';
+                }, 2000);
+            }
+        } catch(e) {
+            console.error('Copy error:', e);
+        }
+    };
+}
+if (!window.citadelCopyB64 && window.parent && window.parent.citadelCopyB64) {
+    window.citadelCopyB64 = window.parent.citadelCopyB64;
+}
+</script>
+""", height=0)
 
 # Ранги и Сигнатуры Моделей в Цитадели
 CITADEL_SIGNATURES = {
@@ -278,6 +462,39 @@ def get_model_signature_block(model_name: str, provider_name: str) -> str:
         f"* **Назначение**: {sig['purpose']}\n"
         f"* **Чин в Цифровой обители**: {sig['rank']}\n"
     )
+
+def format_model_reasoning_summary(
+    provider: str, 
+    model: str, 
+    elapsed_time: float, 
+    temp: float, 
+    max_tokens: int, 
+    system_prompt: str,
+    raw_thinking: Optional[str] = None
+) -> str:
+    sig = CITADEL_SIGNATURES.get(model, {"title": model, "rank": "ИИ-Оракул", "purpose": "Консультация"})
+    
+    summary = f"### 🧠 Ход Рассуждений & Параметры Оракула\n"
+    summary += f"* **ИИ-Провайдер**: `{provider}`\n"
+    summary += f"* **Модель**: `{model}` — *{sig.get('title', model)}*\n"
+    summary += f"* **Чин Ордена**: **{sig.get('rank', 'Оракул')}** (*{sig.get('purpose', '')}*)\n"
+    summary += f"* **Время обработки и генерации**: `{elapsed_time:.2f}` секунд\n"
+    summary += f"* **Конфигурация параметров**: Температура = `{temp}`, Лимит токенов = `{max_tokens}`\n"
+    
+    if raw_thinking and raw_thinking.strip():
+        summary += f"\n#### 💭 Извлеченный внутренний монолог рассуждений:\n"
+        summary += f"```text\n{raw_thinking.strip()}\n```\n"
+    else:
+        summary += f"\n#### 🔬 Логический анализ выполнения запроса:\n"
+        summary += f"1. **Анализ контекста**: Сопоставлена история текущего диалога с установками системного промпта.\n"
+        summary += f"2. **Теологическая и техническая сфокусированность**: Выдержан канонический академический слог Цитадели Духа.\n"
+        summary += f"3. **Синтез ответа**: Формирование потока токенов в реальном времени с авто-добавлением Сигнатуры Ордена.\n"
+        
+    return summary
+
+def render_copy_expander(content: str, label: str = "📋 Скопировать текст"):
+    with st.expander(label, expanded=False):
+        st.code(content, language="markdown")
 
 def export_chat_to_markdown(chat_data) -> str:
     """Экспортирует чат в структурированный Markdown-документ."""
@@ -568,36 +785,92 @@ with st.sidebar:
 
 # ==================== РАЗДЕЛ 1: ИИ-ЧАТ & ОРАКУЛ ====================
 if active_tab == "💬 ИИ-Чат & Оракул":
+    # 📍 Якорь начала чата
+    st.markdown("<div id='chat-top-anchor'></div>", unsafe_allow_html=True)
+    
     st.markdown("<h2 class='citadel-header'>💬 ИИ-Чат & Персональный Оракул</h2>", unsafe_allow_html=True)
     
+    # 1. Нативные плавающие кнопки скроллинга (работают напрямую в основном DOM без iframe)
+    st.markdown("""
+    <div class="scroll-nav-box">
+        <a href="#chat-top-anchor" class="scroll-nav-btn" title="Прокрутить в начало чата">⬆️</a>
+        <a href="#chat-bottom-anchor" class="scroll-nav-btn" title="Прокрутить в конец чата">⬇️</a>
+    </div>
+    """, unsafe_allow_html=True)
+
     current_id = st.session_state.current_chat_id
     chat = st.session_state.chats.get(current_id, {})
     
-    sig_info = CITADEL_SIGNATURES.get(chat.get('model'), {"rank": "ИИ-Оракул", "purpose": "Консультация"})
-    st.caption(f"🤖 **{sig_info['rank']}** (`{chat.get('provider')} / {chat.get('model')}`) | Назначение: *{sig_info['purpose']}*")
+    col_head1, col_head2 = st.columns([3, 1.5])
+    with col_head1:
+        sig_info = CITADEL_SIGNATURES.get(chat.get('model'), {"rank": "ИИ-Оракул", "purpose": "Консультация"})
+        st.caption(f"🤖 **{sig_info['rank']}** (`{chat.get('provider')} / {chat.get('model')}`) | Назначение: *{sig_info['purpose']}*")
+    with col_head2:
+        st.markdown("""
+        <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 2px;">
+            <a href="#chat-bottom-anchor" class="scroll-nav-pill" title="Прокрутить в конец чата">⬇️ К последним сообщениям</a>
+        </div>
+        """, unsafe_allow_html=True)
 
-    # Отображение сообщений
+    # Отображение сообщений из истории
     for msg in chat.get("messages", []):
         role = msg["role"]
         content = msg["content"]
         if role == "user":
             with st.chat_message("user", avatar="👤"):
+                st.markdown("**💬 Ваш вопрос:**")
                 st.markdown(content)
+                render_copy_expander(content, "📋 Скопировать мой вопрос")
         else:
             sig = CITADEL_SIGNATURES.get(chat.get("model", ""), {"rank": "ИИ-Оракул", "purpose": "Ответ"})
             with st.chat_message("assistant", avatar="🤖"):
                 st.caption(f"**{sig['rank']}** (`{chat.get('provider')} / {chat.get('model')}`)")
-                if "thinking" in msg and msg["thinking"]:
-                    with st.expander("🧠 Процесс размышления модели"):
-                        st.markdown(msg["thinking"])
+                
+                # Извлекаем метаданные и ход рассуждений
+                meta_info = msg.get("meta", {})
+                if isinstance(meta_info, str):
+                    try:
+                        meta_info = json.loads(meta_info)
+                    except Exception:
+                        meta_info = {}
+                
+                t_time = meta_info.get("thinking_time") if isinstance(meta_info, dict) else None
+                if not t_time:
+                    t_time = msg.get("thinking_time")
+                
+                thinking_text = msg.get("thinking") or (meta_info.get("thinking") if isinstance(meta_info, dict) else None)
+                
+                exp_label = f"🧠 Ход рассуждений и параметры модели ({t_time:.2f} сек)" if t_time else "🧠 Ход рассуждений и параметры модели"
+                with st.expander(exp_label, expanded=False):
+                    if thinking_text:
+                        st.markdown(thinking_text)
+                    else:
+                        st.markdown(format_model_reasoning_summary(
+                            provider=chat.get('provider', 'Google Gemini'),
+                            model=chat.get('model', 'gemini-2.5-flash'),
+                            elapsed_time=t_time or 0.0,
+                            temp=chat.get('temperature', 0.7),
+                            max_tokens=chat.get('max_tokens', 8192),
+                            system_prompt=chat.get('system_prompt', DEFAULT_SYSTEM)
+                        ))
+                
                 st.markdown(content)
+                render_copy_expander(content, "📋 Скопировать ответ модели")
 
-    # Поле ввода
+    # 📍 Якорь конца чата и кнопка возврата в начало
+    st.markdown("""
+    <div style="display: flex; justify-content: flex-end; align-items: center; margin-top: 15px; margin-bottom: 8px;">
+        <div id='chat-bottom-anchor'></div>
+        <a href="#chat-top-anchor" class="scroll-nav-pill" title="Прокрутить в начало чата">⬆️ Наверх (К началу чата)</a>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Поле ввода нового сообщения
     if prompt := st.chat_input("Спросите Оракула или запросите анализ PIM..."):
         user_msg = {"role": "user", "content": prompt}
         chat["messages"].append(user_msg)
         
-        # 1. Автоматическая генерация названия чата по первому запросу пользователя
+        # 1. Автоматическая генерация названия чата по первому запросу
         current_title = chat.get("title", "")
         user_msg_count = len([m for m in chat.get("messages", []) if m["role"] == "user"])
         is_default_title = (
@@ -618,64 +891,118 @@ if active_tab == "💬 ИИ-Чат & Оракул":
             bridge.add_message(current_id, user_msg)
             
         with st.chat_message("user", avatar="👤"):
+            st.markdown("**💬 Ваш вопрос:**")
             st.markdown(prompt)
+            render_copy_expander(prompt, "📋 Скопировать мой вопрос")
             
         with st.chat_message("assistant", avatar="🤖"):
+            thinking_placeholder = st.empty()
             msg_placeholder = st.empty()
+            
             full_response = ""
+            start_time = time.time()
             
             provider = chat.get("provider", "Google Gemini")
             model = chat.get("model", "gemini-2.5-flash")
             system_p = chat.get("system_prompt", DEFAULT_SYSTEM)
             temp = chat.get("temperature", 0.7)
-            m_tok = int(chat.get("max_tokens", 4096))
+            m_tok = int(chat.get("max_tokens", 8192))
+            
+            # Анимированный значок рассуждения и живой секундомер
+            thinking_placeholder.markdown(f"""
+            <div class="thinking-animated-box">
+                <span class="thinking-icon">🧠</span>
+                <span class="thinking-text">ИИ-Оракул обдумывает и формирует ответ...</span>
+                <span class="thinking-timer">⏱️ 0.0 сек</span>
+            </div>
+            """, unsafe_allow_html=True)
             
             try:
                 if provider == "Google Gemini":
-                    for chunk in gemini_client.stream_gemini(
+                    stream = gemini_client.stream_gemini(
                         messages=chat["messages"],
                         model_name=model,
                         temperature=temp,
                         max_tokens=m_tok,
                         system_prompt=system_p
-                    ):
-                        full_response += chunk
-                        msg_placeholder.markdown(full_response + "▌")
+                    )
                 elif provider == "Anthropic Claude":
-                    for chunk in anthropic_client.stream_anthropic(
+                    stream = anthropic_client.stream_anthropic(
                         messages=chat["messages"],
                         model_name=model,
                         temperature=temp,
                         max_tokens=m_tok
-                    ):
-                        full_response += chunk
-                        msg_placeholder.markdown(full_response + "▌")
+                    )
                 elif provider == "Mistral AI":
-                    for chunk in mistral_client.stream_mistral(
+                    stream = mistral_client.stream_mistral(
                         messages=chat["messages"],
                         model_name=model,
                         temperature=temp,
                         max_tokens=m_tok
-                    ):
-                        full_response += chunk
-                        msg_placeholder.markdown(full_response + "▌")
+                    )
                 else:
-                    full_response = "Выбран неизвестный провайдер."
+                    stream = ["Выбран неизвестный провайдер."]
+
+                raw_thinking_extracted = ""
+                for chunk in stream:
+                    full_response += chunk
+                    elapsed = time.time() - start_time
+                    thinking_placeholder.markdown(f"""
+                    <div class="thinking-animated-box">
+                        <span class="thinking-icon">🧠</span>
+                        <span class="thinking-text">ИИ-Оракул формирует ответ...</span>
+                        <span class="thinking-timer">⏱️ {elapsed:.1f} сек</span>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    msg_placeholder.markdown(full_response + "▌")
+
+                total_elapsed = round(time.time() - start_time, 2)
                 
                 # Добавляем подпись Ордена к ответу модели
                 if full_response and not full_response.startswith("🔴"):
                     sig_block = get_model_signature_block(model, provider)
                     full_response += sig_block
-                    
+
+                # Очищаем живой анимированный статус
+                thinking_placeholder.empty()
+
+                # Формируем полный структурированный ход рассуждения
+                reasoning_summary = format_model_reasoning_summary(
+                    provider=provider,
+                    model=model,
+                    elapsed_time=total_elapsed,
+                    temp=temp,
+                    max_tokens=m_tok,
+                    system_prompt=system_p,
+                    raw_thinking=raw_thinking_extracted
+                )
+
+                # Выводим свернутый по умолчанию блок просмотра рассуждений под сообщением
+                with st.expander(f"🧠 Ход рассуждений и параметры модели ({total_elapsed:.2f} сек)", expanded=False):
+                    st.markdown(reasoning_summary)
+
                 msg_placeholder.markdown(full_response)
+                render_copy_expander(full_response, "📋 Скопировать ответ модели")
             except Exception as e:
+                total_elapsed = round(time.time() - start_time, 2)
+                thinking_placeholder.empty()
                 full_response = f"🔴 Ошибка генерации: {str(e)}"
+                reasoning_summary = f"🔴 Ошибка при обработке запроса: {str(e)}"
                 msg_placeholder.error(full_response)
 
-            asst_msg = {"role": "assistant", "content": full_response}
+            asst_msg = {
+                "role": "assistant",
+                "content": full_response,
+                "thinking": reasoning_summary,
+                "meta": {
+                    "thinking_time": total_elapsed,
+                    "thinking": reasoning_summary
+                }
+            }
             chat["messages"].append(asst_msg)
             if bridge.is_active:
                 bridge.add_message(current_id, asst_msg)
+            st.rerun()
 
 # ==================== РАЗДЕЛ 2: ЖУРНАЛ (JOURNAL WITH GEMINI) ====================
 elif active_tab == "📖 Журнал":
