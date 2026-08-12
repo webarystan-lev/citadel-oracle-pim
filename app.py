@@ -15,7 +15,7 @@ load_dotenv()
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
 import streamlit as st
-from providers import anthropic_client, gemini_client, mistral_client
+from providers import anthropic_client, gemini_client, mistral_client, convex_client
 from providers.convex_client import ConvexBridge
 from providers.security import encrypt_secret, decrypt_secret, verify_gemini_api_key
 
@@ -31,6 +31,7 @@ st.set_page_config(
 importlib.reload(gemini_client)
 importlib.reload(anthropic_client)
 importlib.reload(mistral_client)
+importlib.reload(convex_client)
 
 # Стилистика Цитадели
 CITADEL_CSS = """
@@ -102,6 +103,61 @@ CITADEL_CSS = """
         -webkit-text-fill-color: transparent;
         animation: word-shimmer 4s ease-in-out infinite;
         animation-delay: 2.6s;
+        font-weight: 800;
+        display: inline-block;
+    }
+
+    /* Multi-Word Animated Shimmers for Headers */
+    .word-shimmer-1 {
+        background: linear-gradient(135deg, #38bdf8, #34d399, #2563eb);
+        background-size: 200% 200%;
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        animation: word-shimmer 4s ease-in-out infinite;
+        font-weight: 800;
+        display: inline-block;
+    }
+
+    .word-shimmer-2 {
+        background: linear-gradient(135deg, #c084fc, #f43f5e, #818cf8);
+        background-size: 200% 200%;
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        animation: word-shimmer 4s ease-in-out infinite;
+        animation-delay: 0.8s;
+        font-weight: 800;
+        display: inline-block;
+    }
+
+    .word-shimmer-3 {
+        background: linear-gradient(135deg, #fbbf24, #fb923c, #e11d48);
+        background-size: 200% 200%;
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        animation: word-shimmer 4s ease-in-out infinite;
+        animation-delay: 1.6s;
+        font-weight: 800;
+        display: inline-block;
+    }
+
+    .word-shimmer-4 {
+        background: linear-gradient(135deg, #38bdf8, #818cf8, #c084fc);
+        background-size: 200% 200%;
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        animation: word-shimmer 4s ease-in-out infinite;
+        animation-delay: 2.4s;
+        font-weight: 800;
+        display: inline-block;
+    }
+
+    .word-shimmer-5 {
+        background: linear-gradient(135deg, #f59e0b, #a855f7, #06b6d4);
+        background-size: 200% 200%;
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        animation: word-shimmer 4s ease-in-out infinite;
+        animation-delay: 3.2s;
         font-weight: 800;
         display: inline-block;
     }
@@ -483,7 +539,7 @@ def fetch_mistral_models() -> list:
     return st.session_state.mistral_models
 
 DEFAULT_SYSTEM = (
-    "Ты — Ведущий ИИ-Архитектор и Персональный Оракул Цитадели «Shekinah Cloud». "
+    "Ты — Ведущий ИИ-Архитектор и Персональный Оракул Цитадели («The Spirit of the Shekinah Citadel Oracle»). "
     "Ты являешься цифровым соратником и интеллектуальным помощником Льва Николаевича — "
     "пастора, миссионера («Миссия Шехина») и руководителя «Web Development Studio Web Arystan». "
     "Твой слог уважителен, академичен, глубок и исполнен духовной и технической мудрости."
@@ -497,7 +553,7 @@ def get_model_signature_block(model_name: str, provider_name: str) -> str:
     })
     return (
         f"\n\n---\n"
-        f"🏛️ **Подпись Ордена Shekinah Citadel Oracle Spirit**:\n"
+        f"🏛️ **Подпись Ордена Shekinah Citadel Oracle**:\n"
         f"* **Модель**: `{sig['title']}`\n"
         f"* **Назначение**: {sig['purpose']}\n"
         f"* **Чин в Цифровой обители**: {sig['rank']}\n"
@@ -560,8 +616,8 @@ def export_chat_to_markdown(chat_data) -> str:
     return md
 
 # Инициализация Convex Bridge
-if "convex_bridge" not in st.session_state:
-    st.session_state.convex_bridge = ConvexBridge()
+if "convex_bridge" not in st.session_state or not hasattr(st.session_state.convex_bridge, "update_journal"):
+    st.session_state.convex_bridge = convex_client.ConvexBridge()
 bridge = st.session_state.convex_bridge
 
 # Проверка Авторизации
@@ -1063,68 +1119,438 @@ if active_tab == "💬 ИИ-Чат & Оракул":
                 bridge.add_message(current_id, asst_msg)
             st.rerun()
 
-# ==================== РАЗДЕЛ 2: ЖУРНАЛ (JOURNAL WITH GEMINI) ====================
+# ==================== РАЗДЕЛ 2: МНОГОФУНКЦИОНАЛЬНЫЕ ЖУРНАЛЫ (JOURNAL WITH GEMINI) ====================
 elif active_tab == "📖 Журнал":
-    st.markdown("<h2 class='citadel-header'>📖 Ежедневный Журнал & Рефлексия</h2>", unsafe_allow_html=True)
-    st.caption("Дневниковые записи, духовная рефлексия и благодарения (в стиле Journal with Gemini)")
-    
-    col_left, col_right = st.columns([1, 1])
-    
-    with col_left:
-        st.markdown("<div class='citadel-card'>", unsafe_allow_html=True)
-        st.markdown("### ✍️ Новая запись в Журнал")
-        entry_date = st.date_input("Дата записи")
-        entry_title = st.text_input("Заголовок дня/мысли", value="Благодать и размышление дня")
-        entry_content = st.text_area("Текст рефлексии / мысли / события", height=200, placeholder="Опишите сегодняшние события, благословения или мысли...")
-        entry_tags = st.text_input("Теги (через запятую)", value="благодать, миссия, размышление")
-        
-        col_btn1, col_btn2 = st.columns(2)
-        with col_btn1:
-            if st.button("💾 Сохранить в Журнал", use_container_width=True):
-                if entry_content:
-                    journal_data = {
+    st.markdown("""
+        <h2 style='text-align: center; margin-top: 10px; margin-bottom: 8px; font-family: "Outfit", sans-serif;'>
+            <span style='font-size: 2.2rem; vertical-align: middle; margin-right: 6px;'>📖</span>
+            <span class='word-shimmer-1' style='font-size: 2.2rem; font-weight: 800;'>Система</span>
+            <span class='word-shimmer-2' style='font-size: 2.2rem; font-weight: 800;'>Тематических</span>
+            <span class='word-shimmer-3' style='font-size: 2.2rem; font-weight: 800;'>Журналов</span>
+            <span class='word-shimmer-4' style='font-size: 2.2rem; font-weight: 800;'>&</span>
+            <span class='word-shimmer-5' style='font-size: 2.2rem; font-weight: 800;'>ИИ-Оракул</span>
+        </h2>
+    """, unsafe_allow_html=True)
+    st.caption("Персональные тематические дневники с узкопрофильными вопросами и сквозным ИИ-синтезом (в стиле Journal with Gemini)")
+
+    # 1. Загрузка Журналов / Блокнотов
+    notebooks = bridge.load_notebooks() if bridge.is_active else []
+    if not notebooks:
+        # Резервные дефолтные блокноты
+        notebooks = [
+            {"id": "nb-ai-webdev", "title": "AI & WebDev", "icon": "🤖", "description": "Разработка, ИИ-агенты, веб-технологии", "categoryType": "AI_WEBDEV"},
+            {"id": "nb-mission", "title": "Миссия Шехина", "icon": "🕊️", "description": "Миссионерство, служение и молитвы", "categoryType": "MISSION"},
+            {"id": "nb-school-of-christ", "title": "Школа Христа", "icon": "✝️", "description": "Ученичество, трансформация сердца", "categoryType": "SCHOOL_OF_CHRIST"},
+            {"id": "nb-family", "title": "Семья & Личное", "icon": "👨‍👩‍👧‍👦", "description": "Семейные радости, благословения", "categoryType": "FAMILY"},
+            {"id": "nb-theology", "title": "Теология & Исследования", "icon": "📜", "description": "Апологетика и библейские заметки", "categoryType": "THEOLOGY"},
+            {"id": "nb-favorites", "title": "Избранное & Вдохновение", "icon": "⭐", "description": "Памятные моменты и озарения", "categoryType": "GENERAL"}
+        ]
+
+    # Инициализация выбора активного Журнала
+    if "active_notebook_id" not in st.session_state or not st.session_state.active_notebook_id:
+        st.session_state.active_notebook_id = notebooks[0]["id"]
+
+    nb_dict = {nb["id"]: nb for nb in notebooks}
+    if st.session_state.active_notebook_id not in nb_dict:
+        st.session_state.active_notebook_id = notebooks[0]["id"]
+
+    active_nb = nb_dict[st.session_state.active_notebook_id]
+
+    # --- ПАНЕЛЬ ВЫБОРА И СОЗДАНИЯ ТЕМАТИЧЕСКОГО ЖУРНАЛА ---
+    st.markdown("<div class='citadel-card'>", unsafe_allow_html=True)
+    col_nb_select, col_nb_add = st.columns([3, 1])
+
+    with col_nb_select:
+        selected_nb_id = st.selectbox(
+            "📂 Выберите Активный Тематический Журнал:",
+            options=list(nb_dict.keys()),
+            format_func=lambda nid: f"{nb_dict[nid].get('icon', '📓')} {nb_dict[nid].get('title', 'Журнал')} — {nb_dict[nid].get('description', '')}",
+            index=list(nb_dict.keys()).index(st.session_state.active_notebook_id)
+        )
+        st.session_state.active_notebook_id = selected_nb_id
+        active_nb = nb_dict[selected_nb_id]
+
+    with col_nb_add:
+        with st.popover("➕ Создать Журнал"):
+            st.markdown("#### 📓 Новый Тематический Журнал")
+            new_nb_title = st.text_input("Название (напр., AI & WebDev)")
+            new_nb_desc = st.text_input("Описание Журнала")
+            new_nb_icon = st.text_input("Иконка (эмодзи)", value="📓")
+            new_nb_cat_type = st.selectbox("Тематический профиль ИИ-вопросов", [
+                "AI_WEBDEV", "MISSION", "SCHOOL_OF_CHRIST", "FAMILY", "THEOLOGY", "GENERAL"
+            ], format_func=lambda x: {
+                "AI_WEBDEV": "💻 AI & WebDev (Код, ИИ, Архитектура)",
+                "MISSION": "🕊️ Миссия Шехина (Служение, Молитвы)",
+                "SCHOOL_OF_CHRIST": "✝️ Школа Христа (Ученичество, Сердце)",
+                "FAMILY": "👨‍👩‍👧‍👦 Семья & Личное (Дом, Благодарности)",
+                "THEOLOGY": "📜 Теология & Исследования (Писание)",
+                "GENERAL": "⭐ Общий профиль рефлексии"
+            }[x])
+
+            if st.button("🚀 Создать Журнал", use_container_width=True):
+                if new_nb_title:
+                    nb_data = {
                         "id": str(uuid.uuid4()),
-                        "date": str(entry_date),
-                        "title": entry_title,
-                        "content": entry_content,
-                        "tags": [t.strip() for t in entry_tags.split(",") if t.strip()],
-                        "reflectionQuestions": "",
-                        "aiSynthesis": ""
+                        "title": new_nb_title,
+                        "description": new_nb_desc,
+                        "icon": new_nb_icon,
+                        "categoryType": new_nb_cat_type
                     }
                     if bridge.is_active:
-                        bridge.save_journal(journal_data)
-                        st.success("✅ Запись успешно сохранена в Convex DB!")
-                    else:
-                        st.success("✅ Запись сохранена локально!")
+                        bridge.save_notebook(nb_data)
+                    st.success("✅ Журнал создан!")
+                    st.session_state.active_notebook_id = nb_data["id"]
                     st.rerun()
                 else:
-                    st.warning("Заполните текст записи.")
-        
-        with col_btn2:
-            if st.button("🔮 Сгенерировать ИИ-Вопросы", use_container_width=True):
-                if entry_content:
-                    with st.spinner("Оракул формирует глубокие вопросы для рефлексии..."):
-                        prompt_q = f"Проанализируй следующую дневниковую запись и сформируй 3 глубоких, назидательных вопроса для вечерней духовной рефлексии:\n\n{entry_content}"
-                        q_resp = gemini_client.ask_gemini(prompt_q)
-                        st.info(f"**ИИ-Вопросы для рефлексии:**\n\n{q_resp}")
-                else:
-                    st.warning("Сначала введите текст записи.")
-        st.markdown("</div>", unsafe_allow_html=True)
-        
-    with col_right:
-        st.markdown("### 📜 История Журнала")
-        journals = bridge.load_journals() if bridge.is_active else []
-        if journals:
-            for j in journals:
-                with st.expander(f"📅 {j.get('date', '')} — {j.get('title', 'Без названия')}"):
-                    st.markdown(j.get("content", ""))
-                    if j.get("tags"):
-                        st.caption(f"🏷️ Теги: {', '.join(j.get('tags', []))}")
-                    if st.button("🗑️ Удалить", key=f"del_j_{j.get('id')}"):
-                        bridge.delete_journal(j.get("id"))
+                    st.warning("Введите название журнала.")
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    # Загружаем проекты для привязки
+    all_projects = bridge.load_projects() if bridge.is_active else []
+    project_options = {"": "📌 Без привязки к проекту"}
+    for p in all_projects:
+        project_options[p.get("id", "")] = f"📁 {p.get('title', 'Проект')}"
+
+    # Загружаем записи ТЕКУЩЕГО выбранного журнала
+    if bridge.is_active:
+        active_journals = bridge.load_journals_by_notebook(active_nb["id"])
+    else:
+        active_journals = []
+
+    # ДВЕ КОЛОНКИ ДЛЯ ТЕКУЩЕГО ЖУРНАЛА
+    col_left, col_right = st.columns([1, 1])
+
+    with col_left:
+        st.markdown("<div class='citadel-card'>", unsafe_allow_html=True)
+        st.markdown(f"### ✍️ Добавить запись в `{active_nb.get('icon')} {active_nb.get('title')}`")
+
+        import datetime
+        entry_date = st.date_input("Дата записи", value=datetime.date.today(), key=f"new_date_{active_nb['id']}")
+        entry_title = st.text_input("Заголовок дня/мысли", value=f"Размышление в {active_nb.get('title')}", key=f"new_title_{active_nb['id']}")
+
+        selected_project_id = st.selectbox(
+            "Привязать к существующему проекту",
+            options=list(project_options.keys()),
+            format_func=lambda x: project_options[x],
+            key=f"new_proj_{active_nb['id']}"
+        )
+
+        entry_tags = st.text_input("Теги (через запятую)", value=f"{active_nb.get('title').lower()}, рефлексия", key=f"new_tags_{active_nb['id']}")
+
+        tab_write, tab_preview = st.tabs(["✍️ Текст записи (Markdown)", "👁️ Предпросмотр Markdown"])
+
+        with tab_write:
+            entry_content = st.text_area(
+                "Содержимое записи",
+                height=220,
+                placeholder="Используйте форматирование Markdown:\n# Заголовок\n> Цитата или мысль\n* Пункт 1\n* Пункт 2",
+                key=f"new_content_{active_nb['id']}"
+            )
+
+        with tab_preview:
+            st.markdown("<div style='background: rgba(15, 23, 42, 0.6); padding: 15px; border-radius: 8px; border: 1px solid rgba(96, 165, 250, 0.2); min-height: 200px;'>", unsafe_allow_html=True)
+            if entry_content and entry_content.strip():
+                st.markdown(entry_content)
+            else:
+                st.info("Введите текст записи слева для предварительного просмотра.")
+            st.markdown("</div>", unsafe_allow_html=True)
+
+        if st.button(f"💾 Сохранить в `{active_nb.get('title')}`", use_container_width=True, type="primary"):
+            if entry_content and entry_content.strip():
+                journal_data = {
+                    "id": str(uuid.uuid4()),
+                    "notebookId": active_nb["id"],
+                    "date": str(entry_date),
+                    "title": entry_title,
+                    "content": entry_content,
+                    "tags": [t.strip() for t in entry_tags.split(",") if t.strip()],
+                    "category": active_nb.get("title"),
+                    "projectId": selected_project_id,
+                    "reflectionQuestions": "",
+                    "aiSynthesis": ""
+                }
+                if bridge.is_active:
+                    saved = bridge.save_journal(journal_data)
+                    if saved:
+                        st.success(f"✅ Запись сохранена в журнал «{active_nb.get('title')}»!")
+                        time.sleep(0.5)
                         st.rerun()
+                    else:
+                        st.error("🔴 Ошибка сохранения в Convex DB.")
+                else:
+                    st.success("✅ Запись сохранена локально!")
+                    time.sleep(0.5)
+                    st.rerun()
+            else:
+                st.warning("Заполните текст записи перед сохранением.")
+
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    with col_right:
+        st.markdown(f"### 📜 Архив Журнала «{active_nb.get('icon')} {active_nb.get('title')}» (`{len(active_journals)}` записей)")
+
+        if active_journals:
+            proj_dict = {p.get("id"): p.get("title") for p in all_projects}
+
+            for j in active_journals:
+                j_id = j.get("id")
+                j_title = j.get("title", "Без названия")
+                j_date = j.get("date", "")
+                j_proj_id = j.get("projectId", "")
+                j_proj_title = proj_dict.get(j_proj_id, "")
+
+                expander_label = f"📅 {j_date} | {active_nb.get('icon')} — {j_title}"
+                if j_proj_title:
+                    expander_label += f" (📁 {j_proj_title})"
+
+                with st.expander(expander_label):
+                    if st.session_state.get("editing_journal_id") == j_id:
+                        st.markdown("#### ✏️ Редактирование записи")
+                        edit_date_val = datetime.date.fromisoformat(j_date) if j_date else datetime.date.today()
+                        edit_date = st.date_input("Дата", value=edit_date_val, key=f"edit_date_{j_id}")
+                        edit_title = st.text_input("Заголовок", value=j_title, key=f"edit_title_{j_id}")
+
+                        edit_proj_id = st.selectbox(
+                            "Привязать к проекту",
+                            options=list(project_options.keys()),
+                            index=list(project_options.keys()).index(j_proj_id) if j_proj_id in project_options else 0,
+                            format_func=lambda x: project_options[x],
+                            key=f"edit_proj_{j_id}"
+                        )
+
+                        edit_tags = st.text_input("Теги", value=", ".join(j.get("tags", [])), key=f"edit_tags_{j_id}")
+
+                        tab_edit_text, tab_edit_prev = st.tabs(["✍️ Редактор Markdown", "👁️ Предпросмотр"])
+                        with tab_edit_text:
+                            edit_content = st.text_area("Текст записи", value=j.get("content", ""), height=200, key=f"edit_content_{j_id}")
+                        with tab_edit_prev:
+                            st.markdown("<div style='background: rgba(15, 23, 42, 0.6); padding: 15px; border-radius: 8px;'>", unsafe_allow_html=True)
+                            st.markdown(edit_content if edit_content else "*Пусто*")
+                            st.markdown("</div>", unsafe_allow_html=True)
+
+                        col_esave, col_ecancel = st.columns(2)
+                        with col_esave:
+                            if st.button("💾 Сохранить", key=f"save_edit_{j_id}", type="primary", use_container_width=True):
+                                updated_data = {
+                                    "id": j_id,
+                                    "notebookId": active_nb["id"],
+                                    "date": str(edit_date),
+                                    "title": edit_title,
+                                    "content": edit_content,
+                                    "projectId": edit_proj_id,
+                                    "tags": [t.strip() for t in edit_tags.split(",") if t.strip()]
+                                }
+                                if bridge.is_active:
+                                    bridge.update_journal(updated_data)
+                                st.session_state.editing_journal_id = None
+                                st.success("✅ Сохранено!")
+                                time.sleep(0.5)
+                                st.rerun()
+
+                        with col_ecancel:
+                            if st.button("❌ Отмена", key=f"cancel_edit_{j_id}", use_container_width=True):
+                                st.session_state.editing_journal_id = None
+                                st.rerun()
+                    else:
+                        if j_proj_title:
+                            st.markdown(f"📁 **Проект**: `{j_proj_title}`")
+                        st.markdown("---")
+                        st.markdown(j.get("content", ""))
+                        st.markdown("---")
+                        if j.get("tags"):
+                            st.caption(f"🏷️ Теги: {', '.join(j.get('tags', []))}")
+
+                        col_act1, col_act2 = st.columns(2)
+                        with col_act1:
+                            if st.button("✏️ Редактировать", key=f"btn_edit_{j_id}", use_container_width=True):
+                                st.session_state.editing_journal_id = j_id
+                                st.rerun()
+                        with col_act2:
+                            if st.button("🗑️ Удалить", key=f"btn_del_{j_id}", use_container_width=True):
+                                if bridge.is_active:
+                                    bridge.delete_journal(j_id)
+                                st.success("🗑️ Запись удалена!")
+                                time.sleep(0.5)
+                                st.rerun()
         else:
-            st.info("Пока нет сохранений в Журнале. Создайте первую запись слева.")
+            st.info(f"В журнале «{active_nb.get('title')}» пока нет записей. Создайте первую запись слева.")
+
+    # ==================== ПОЛНОШИРИННАЯ СЕКЦИЯ: ИИ-ЦЕНТР РЕФЛЕКСИИ И СКВОЗНОГО СИНТЕЗА ====================
+    st.markdown("<br><hr>", unsafe_allow_html=True)
+    st.markdown(f"### 🔮 ИИ-Центр Рефлексии и Сквозного Синтеза — `{active_nb.get('icon')} {active_nb.get('title')}`")
+    st.caption("Глубокий доменный анализ отдельной записи или сквозной синтез всех записей Журнала в стиле Journal with Gemini")
+
+    st.markdown("<div class='citadel-card'>", unsafe_allow_html=True)
+
+    # 1. Режим Анализа
+    analysis_mode = st.radio(
+        "🎯 Режим ИИ-Анализа:",
+        ["📌 Анализ ОДНОЙ записи (текущей из редактора или сохраненной)", f"🌐 Сквозной ИИ-Синтез ВСЕХ {len(active_journals)} записей Журнала «{active_nb.get('title')}»"],
+        horizontal=True,
+        key=f"analysis_mode_{active_nb['id']}"
+    )
+
+    selected_entry_text = ""
+    if "📌" in analysis_mode:
+        if active_journals:
+            entry_opts = {}
+            for j in active_journals:
+                entry_opts[j["id"]] = f"📅 {j.get('date')} — {j.get('title')}"
+            entry_opts["new"] = "✍️ Несохраненная запись из формы слева"
+
+            sel_e = st.selectbox(
+                "Выберите запись для анализа:",
+                options=list(entry_opts.keys()),
+                format_func=lambda x: entry_opts[x],
+                key=f"sel_entry_{active_nb['id']}"
+            )
+            if sel_e == "new":
+                selected_entry_text = st.session_state.get(f"new_content_{active_nb['id']}", "")
+            else:
+                for j in active_journals:
+                    if j["id"] == sel_e:
+                        selected_entry_text = f"Заголовок: {j.get('title')}\nДата: {j.get('date')}\nТекст:\n{j.get('content')}"
+                        break
+        else:
+            selected_entry_text = st.session_state.get(f"new_content_{active_nb['id']}", "")
+
+    # 2. Выбор ИИ-Модели и Провайдера
+    col_prov, col_mod = st.columns([1, 2])
+    with col_prov:
+        ai_provider = st.selectbox("ИИ-Провайдер", ["Google Gemini", "Anthropic Claude", "Mistral AI"], key=f"ai_ref_prov_{active_nb['id']}")
+    with col_mod:
+        if ai_provider == "Google Gemini":
+            avail_mods = list(DEFAULT_GEMINI_MODELS.keys())
+            ai_model = st.selectbox("Модель ИИ", avail_mods, index=0, format_func=lambda x: DEFAULT_GEMINI_MODELS.get(x, x), key=f"ai_ref_mod_gem_{active_nb['id']}")
+        elif ai_provider == "Anthropic Claude":
+            avail_mods = list(DEFAULT_ANTHROPIC_MODELS.keys())
+            ai_model = st.selectbox("Модель ИИ", avail_mods, index=5 if len(avail_mods)>5 else 0, format_func=lambda x: DEFAULT_ANTHROPIC_MODELS.get(x, x), key=f"ai_ref_mod_claude_{active_nb['id']}")
+        elif ai_provider == "Mistral AI":
+            avail_mods = list(DEFAULT_MISTRAL_MODELS.keys())
+            ai_model = st.selectbox("Модель ИИ", avail_mods, index=0, format_func=lambda x: DEFAULT_MISTRAL_MODELS.get(x, x), key=f"ai_ref_mod_mistral_{active_nb['id']}")
+
+    # 3. Доменные Шаблонные Вопросы в зависимости от Тематики Журнала
+    cat_type = active_nb.get("categoryType", "GENERAL")
+
+    if cat_type == "AI_WEBDEV":
+        templates = [
+            "💻 [Код & Архитектура]: Какие алгоритмы, стек и архитектурные решения в записи наиболее эффективны?",
+            "🤖 [ИИ-Агенты & UX]: Как применение ИИ и интерфейса улучшило систему PIM и пользовательский опыт?",
+            "⚡ [Оптимизация]: Какие 3 шага по рефакторингу и оптимизации кода следует сделать следующим шагом?",
+            "🐛 [Анализ Ошибок]: Каков главный урок из возникших технических сложностей или багов?"
+        ]
+    elif cat_type == "MISSION":
+        templates = [
+            "🕊️ [Проявление Благодати]: Где в событиях записи явно видна рука Божья и духовные плоды?",
+            "🌍 [Миссионерские Нужды]: Какие молитвенные нужды, люди и вызовы доверены Миссии в этой записи?",
+            "🤝 [Единство и Победы]: Как укрепляется команда Миссии и какие духовные победы одержаны?",
+            "📖 [Духовное Слово]: Какое откровение и Писание направляют служение Миссии Шехина?"
+        ]
+    elif cat_type == "SCHOOL_OF_CHRIST":
+        templates = [
+            "✝️ [Характер Христа]: Какую глубину характера Христова, смирения и любви открыл Дух Святой?",
+            "📖 [Библейские Истины]: Какое место Писания и откровение коснулось сердца в этой записи?",
+            "💡 [Ученичество]: В чем проявилось практическое послушание велению Господню?",
+            "🕊️ [Трансформация Сердца]: Какие внутренние мотивы требуют очищения, Покаяния и молитвы?"
+        ]
+    elif cat_type == "FAMILY":
+        templates = [
+            "👨‍👩‍👧‍👦 [Семейный Мир]: За какие радости, покой и благодарности в доме я славлю Бога?",
+            "❤️ [Любовь и Забота]: Как я проявил мудрость, доброту и заботу к близким сегодня?",
+            "🌿 [Мир Души]: Какие личные переживания требуют Божьего умиротворения и поддержки?"
+        ]
+    elif cat_type == "THEOLOGY":
+        templates = [
+            "📜 [Доктринальный Анализ]: Какие библейские и теологические истины сформулированы в записи?",
+            "🔍 [Академический Синтез]: Каковы параллели со Священным Писанием и выводы апологетики?"
+        ]
+    else: # GENERAL
+        templates = [
+            "🔮 [Комплексный анализ]: 3 глубоких назидательных вопроса для вечерней духовной рефлексии",
+            "🕊️ [Благодарность]: В чем проявилось Божье присутствие и благословения сегодня?",
+            "💡 [Урок Жизни]: Какой главный урок содержится в этих событиях?"
+        ]
+
+    templates.append("✍️ [Свой Произвольный Вопрос]: Ввести собственный вопрос ниже...")
+
+    sel_template = st.selectbox("🎯 Выберите Шаблонный Вопрос или укажите свой:", templates, key=f"sel_template_{active_nb['id']}")
+
+    custom_question = ""
+    if "✍️" in sel_template:
+        custom_question = st.text_input("✍️ Введите Ваш уникальный вопрос к ИИ-Оракулу:", placeholder="Например: Сформируй молитву и вывод по этой записи...", key=f"custom_q_{active_nb['id']}")
+
+    if st.button("🚀 Сгенерировать ИИ-Рефлексию и Синтез", type="primary", use_container_width=True):
+        # Формируем текст контекста
+        if "🌐" in analysis_mode:
+            if not active_journals:
+                st.warning("В текущем журнале нет сохраненных записей для сквозного анализа.")
+                st.stop()
+            context_text = f"АРХИВ ВСЕХ ЗАПИСЕЙ ЖУРНАЛА «{active_nb.get('title')}» ({len(active_journals)} записей):\n\n"
+            for idx, j in enumerate(active_journals, 1):
+                context_text += f"--- Запись #{idx} ({j.get('date')}) ---\nЗаголовок: {j.get('title')}\nТекст:\n{j.get('content')}\n\n"
+        else:
+            if not selected_entry_text or not selected_entry_text.strip():
+                st.warning("Введите текст записи или выберите сохраненную запись из списка.")
+                st.stop()
+            context_text = f"ЗАПИСЬ ЖУРНАЛА «{active_nb.get('title')}»:\n\n{selected_entry_text}"
+
+        # Формируем вопрос
+        if "✍️" in sel_template:
+            final_q = custom_question if custom_question.strip() else "Сформируй глубокий духовный вывод и вопросы по этой записи."
+        else:
+            final_q = sel_template
+
+        prompt = (
+            f"Ты — Персональный ИИ-Оракул и Ведущий Аналитик Цитадели Духа («Shekinah Cloud»). "
+            f"Проанализируй предоставленные материалы Журнала «{active_nb.get('title')}» ({active_nb.get('description')}).\n\n"
+            f"ЗАПРОС И ВОПРОС ПОЛЬЗОВАТЕЛЯ:\n{final_q}\n\n"
+            f"КОНТЕКСТ ЖУРНАЛА:\n{context_text}\n\n"
+            f"ТРЕБОВАНИЯ К ОТВЕТУ:\n"
+            f"1. Ответ должен быть выведен в БОГАТОМ, ВЕЛИКОЛЕПНОМ формате Markdown с эмодзи, иконками, выделением ключевых мыслей и цитатами.\n"
+            f"2. Дай глубокий, академичный, духовно назидательный и практический ответ во всю ширину экрана.\n"
+            f"3. Подведи 3 конкретных ключевых вывода (Takeaways) и сформулируй молитву или напутствие."
+        )
+
+        with st.spinner(f"⏳ {ai_provider} ({ai_model}) выполняет глубокий анализ..."):
+            try:
+                if ai_provider == "Google Gemini":
+                    ai_res = gemini_client.ask_gemini(prompt, model_name=ai_model)
+                elif ai_provider == "Anthropic Claude":
+                    ai_res = anthropic_client.ask_anthropic(prompt, model_name=ai_model)
+                elif ai_provider == "Mistral AI":
+                    ai_res = mistral_client.ask_mistral(prompt, model_name=ai_model)
+                else:
+                    ai_res = gemini_client.ask_gemini(prompt)
+
+                # Автоматически добавляем сигнатуру модели
+                sig_block = get_model_signature_block(ai_model, ai_provider)
+                if sig_block not in ai_res:
+                    ai_res += sig_block
+
+                st.session_state[f"ai_journal_res_{active_nb['id']}"] = ai_res
+                st.success(f"✅ ИИ-Рефлексия успешно сгенерирована моделью {ai_model}!")
+            except Exception as e:
+                st.error(f"🔴 Ошибка при генерации ИИ-ответа: {str(e)}")
+
+    # Вывод результата генерации во всю ширину
+    saved_ai_res = st.session_state.get(f"ai_journal_res_{active_nb['id']}", "")
+    if saved_ai_res:
+        st.markdown("---")
+        st.markdown("#### 📜 Результат ИИ-Анализа и Духовной Рефлексии:")
+        st.markdown("<div style='background: rgba(17, 24, 39, 0.85); padding: 25px; border-radius: 12px; border: 1px solid rgba(147, 51, 234, 0.4); box-shadow: 0 4px 20px rgba(0,0,0,0.4);'>", unsafe_allow_html=True)
+        st.markdown(saved_ai_res)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        col_act_copy, col_act_clear = st.columns([3, 1])
+        with col_act_copy:
+            render_copy_expander(saved_ai_res, "📋 Скопировать ИИ-Рефлексию в буфер обмена")
+        with col_act_clear:
+            if st.button("🗑️ Очистить ответ ИИ", key=f"clear_ai_res_{active_nb['id']}", use_container_width=True):
+                st.session_state[f"ai_journal_res_{active_nb['id']}"] = ""
+                st.rerun()
+
+    st.markdown("</div>", unsafe_allow_html=True)
 
 # ==================== РАЗДЕЛ 3: ПРОЕКТЫ ====================
 elif active_tab == "📁 Проекты":

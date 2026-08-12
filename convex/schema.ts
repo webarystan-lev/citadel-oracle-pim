@@ -24,18 +24,32 @@ export default defineSchema({
         createdAt: v.float64(),     // Timestamp создания
     }).index("by_chatId", ["chatId"]),
 
-    // 📖 Таблица «Журнал» (Journal with Gemini style)
+    // 📚 Таблица «Тематические Журналы / Блокноты»
+    notebooks: defineTable({
+        id: v.string(),                  // UUID журнала
+        title: v.string(),               // Название (напр., "AI & WebDev", "Миссия Шехина")
+        description: v.string(),         // Описание журнала
+        icon: v.string(),                // Иконка (напр., "🤖", "🕊️", "✝️")
+        categoryType: v.string(),        // Тип темы ("AI_WEBDEV", "MISSION", "SCHOOL_OF_CHRIST", "FAMILY", "THEOLOGY", "GENERAL")
+        createdAt: v.float64(),
+        updatedAt: v.float64(),
+    }).index("by_uuid", ["id"]),
+
+    // 📖 Таблица «Записи Журналов» (Journal with Gemini style)
     journals: defineTable({
         id: v.string(),                  // UUID записи
+        notebookId: v.optional(v.string()), // UUID родительского журнала/блокнота
         date: v.string(),                // Дата формата YYYY-MM-DD
         title: v.string(),               // Заголовок записи
         content: v.string(),             // Текст дневниковой записи / рефлексии
         tags: v.array(v.string()),       // Теги записи (напр., ["благодать", "миссия"])
-        reflectionQuestions: v.optional(v.string()), // Вопросы для вечерней/утренней рефлексии от ИИ
-        aiSynthesis: v.optional(v.string()),         // ИИ-выводы и саммари
+        category: v.optional(v.string()), // Категория записи
+        projectId: v.optional(v.string()), // UUID привязанного проекта
+        reflectionQuestions: v.optional(v.string()), // Вопросы от ИИ
+        aiSynthesis: v.optional(v.string()),         // ИИ-выводы
         createdAt: v.float64(),
         updatedAt: v.float64(),
-    }).index("by_uuid", ["id"]).index("by_date", ["date"]),
+    }).index("by_uuid", ["id"]).index("by_notebookId", ["notebookId"]).index("by_date", ["date"]),
 
     // 📁 Таблица «Проекты»
     projects: defineTable({

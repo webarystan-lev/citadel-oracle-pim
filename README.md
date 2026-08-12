@@ -1,7 +1,7 @@
-# 🏛️ Citadel Oracle PIM (Personal Information Manager & Knowledge Hub)
+# 🏛️ The Spirit of the Shekinah Citadel Oracle (Citadel Oracle PIM)
 > *«Се, Я полагаю в Сионе камень краеугольный, избранный, драгоценный...» (1 Петра 2:6)*
 
-**Citadel Oracle PIM** — это суверенный цифровой органайзер, база знаний, зашифрованный сейф паролей и персональный ИИ-Оракул, созданный для **Льва Николаевича** (пастора с 2002 года, миссионера, руководителя «Миссии Шехина» и основателя **Web Development Studio Web Arystan**).
+**The Spirit of the Shekinah Citadel Oracle (Citadel Oracle PIM)** — это суверенный цифровой органайзер, база знаний, зашифрованный сейф паролей и персональный ИИ-Оракул, созданный для **Льва Николаевича** (пастора с 2002 года, миссионера, руководителя «Миссии Шехина» и основателя **Web Development Studio Web Arystan**).
 
 Система спроектирована специально для размещения в интернете с возможностью защищенного доступа из любых миссионерских поездок и локаций, обеспечивая безопасную работу с информацией, проектами и молитвенными журналами.
 
@@ -17,7 +17,7 @@
      * **Anthropic Claude**: `claude-opus-5`, `claude-sonnet-5`, `claude-sonnet-4-6`, `claude-haiku-4-5` и др.
      * **Mistral AI**: `mistral-large-latest`, `codestral-latest`, `devstral-latest`, `mistral-medium-latest` и др.
    * Управление параметрами генерации (Temperature, Max Tokens, System Prompt).
-   * Обязательная подпись Ордена (**Shekinah Citadel Oracle Spirit**) к каждому ответу.
+   * Обязательная подпись Ордена (**Shekinah Citadel Oracle**) к каждому ответу.
    * Экспорт диалогов в структурированный Markdown.
 
 2. **📖 Ежедневный Журнал (Journal with Gemini)**:

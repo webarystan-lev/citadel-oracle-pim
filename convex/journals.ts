@@ -3,17 +3,31 @@ import { v } from "convex/values";
 
 export const listJournals = query({
     handler: async (ctx) => {
-        return await ctx.db.query("journals").order("desc").take(100);
+        return await ctx.db.query("journals").order("desc").take(200);
+    },
+});
+
+export const listJournalsByNotebook = query({
+    args: { notebookId: v.string() },
+    handler: async (ctx, args) => {
+        return await ctx.db
+            .query("journals")
+            .withIndex("by_notebookId", (q) => q.eq("notebookId", args.notebookId))
+            .order("desc")
+            .take(200);
     },
 });
 
 export const createJournal = mutation({
     args: {
         id: v.string(),
+        notebookId: v.optional(v.string()),
         date: v.string(),
         title: v.string(),
         content: v.string(),
         tags: v.array(v.string()),
+        category: v.optional(v.string()),
+        projectId: v.optional(v.string()),
         reflectionQuestions: v.optional(v.string()),
         aiSynthesis: v.optional(v.string()),
     },
@@ -21,10 +35,13 @@ export const createJournal = mutation({
         const now = Date.now();
         return await ctx.db.insert("journals", {
             id: args.id,
+            notebookId: args.notebookId,
             date: args.date,
             title: args.title,
             content: args.content,
             tags: args.tags,
+            category: args.category,
+            projectId: args.projectId,
             reflectionQuestions: args.reflectionQuestions,
             aiSynthesis: args.aiSynthesis,
             createdAt: now,
@@ -36,9 +53,13 @@ export const createJournal = mutation({
 export const updateJournal = mutation({
     args: {
         id: v.string(),
+        notebookId: v.optional(v.string()),
+        date: v.optional(v.string()),
         title: v.optional(v.string()),
         content: v.optional(v.string()),
         tags: v.optional(v.array(v.string())),
+        category: v.optional(v.string()),
+        projectId: v.optional(v.string()),
         reflectionQuestions: v.optional(v.string()),
         aiSynthesis: v.optional(v.string()),
     },
@@ -51,9 +72,13 @@ export const updateJournal = mutation({
         if (!existing) return null;
 
         const updateData: any = { updatedAt: Date.now() };
+        if (args.notebookId !== undefined) updateData.notebookId = args.notebookId;
+        if (args.date !== undefined) updateData.date = args.date;
         if (args.title !== undefined) updateData.title = args.title;
         if (args.content !== undefined) updateData.content = args.content;
         if (args.tags !== undefined) updateData.tags = args.tags;
+        if (args.category !== undefined) updateData.category = args.category;
+        if (args.projectId !== undefined) updateData.projectId = args.projectId;
         if (args.reflectionQuestions !== undefined) updateData.reflectionQuestions = args.reflectionQuestions;
         if (args.aiSynthesis !== undefined) updateData.aiSynthesis = args.aiSynthesis;
 

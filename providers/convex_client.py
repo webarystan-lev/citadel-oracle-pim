@@ -160,7 +160,43 @@ class ConvexBridge:
             logger.error(f"🔴 Ошибка messages:add: {str(e)}")
             return False
 
-    # ==================== ЖУРНАЛ (JOURNALS) ====================
+    # ==================== ТЕМАТИЧЕСКИЕ ЖУРНАЛЫ / БЛОКНОТЫ (NOTEBOOKS) ====================
+    def load_notebooks(self) -> List[Dict[str, Any]]:
+        if not self.is_active or not self.client:
+            return []
+        try:
+            return self.client.query("notebooks:listNotebooks")
+        except Exception as e:
+            logger.error(f"🔴 Ошибка notebooks:listNotebooks: {str(e)}")
+            return []
+
+    def save_notebook(self, notebook_data: Dict[str, Any]) -> bool:
+        if not self.is_active or not self.client:
+            return False
+        try:
+            self.client.mutation("notebooks:createNotebook", {
+                "id": notebook_data["id"],
+                "title": notebook_data["title"],
+                "description": notebook_data.get("description", ""),
+                "icon": notebook_data.get("icon", "📓"),
+                "categoryType": notebook_data.get("categoryType", "GENERAL")
+            })
+            return True
+        except Exception as e:
+            logger.error(f"🔴 Ошибка notebooks:createNotebook: {str(e)}")
+            return False
+
+    def delete_notebook(self, notebook_id: str) -> bool:
+        if not self.is_active or not self.client:
+            return False
+        try:
+            self.client.mutation("notebooks:deleteNotebook", {"id": notebook_id})
+            return True
+        except Exception as e:
+            logger.error(f"🔴 Ошибка notebooks:deleteNotebook: {str(e)}")
+            return False
+
+    # ==================== ЗАПИСИ ЖУРНАЛОВ (JOURNALS) ====================
     def load_journals(self) -> List[Dict[str, Any]]:
         if not self.is_active or not self.client:
             return []
@@ -170,22 +206,60 @@ class ConvexBridge:
             logger.error(f"🔴 Ошибка journals:listJournals: {str(e)}")
             return []
 
+    def load_journals_by_notebook(self, notebook_id: str) -> List[Dict[str, Any]]:
+        if not self.is_active or not self.client:
+            return []
+        try:
+            return self.client.query("journals:listJournalsByNotebook", {"notebookId": notebook_id})
+        except Exception as e:
+            logger.error(f"🔴 Ошибка journals:listJournalsByNotebook: {str(e)}")
+            # Фолбэк на фильтрацию по клиентской стороне
+            all_j = self.load_journals()
+            return [j for j in all_j if j.get("notebookId") == notebook_id]
+
     def save_journal(self, journal_data: Dict[str, Any]) -> bool:
         if not self.is_active or not self.client:
             return False
         try:
-            self.client.mutation("journals:createJournal", {
+            payload = {
                 "id": journal_data["id"],
                 "date": journal_data["date"],
                 "title": journal_data["title"],
                 "content": journal_data["content"],
                 "tags": journal_data.get("tags", []),
+                "category": journal_data.get("category", "Размышление"),
+                "projectId": journal_data.get("projectId", ""),
                 "reflectionQuestions": journal_data.get("reflectionQuestions", ""),
                 "aiSynthesis": journal_data.get("aiSynthesis", "")
-            })
+            }
+            if journal_data.get("notebookId"):
+                payload["notebookId"] = journal_data["notebookId"]
+
+            self.client.mutation("journals:createJournal", payload)
             return True
         except Exception as e:
             logger.error(f"🔴 Ошибка journals:createJournal: {str(e)}")
+            return False
+
+    def update_journal(self, journal_data: Dict[str, Any]) -> bool:
+        if not self.is_active or not self.client:
+            return False
+        try:
+            payload: Dict[str, Any] = {"id": journal_data["id"]}
+            if "notebookId" in journal_data: payload["notebookId"] = journal_data["notebookId"]
+            if "date" in journal_data: payload["date"] = journal_data["date"]
+            if "title" in journal_data: payload["title"] = journal_data["title"]
+            if "content" in journal_data: payload["content"] = journal_data["content"]
+            if "tags" in journal_data: payload["tags"] = journal_data["tags"]
+            if "category" in journal_data: payload["category"] = journal_data["category"]
+            if "projectId" in journal_data: payload["projectId"] = journal_data["projectId"]
+            if "reflectionQuestions" in journal_data: payload["reflectionQuestions"] = journal_data["reflectionQuestions"]
+            if "aiSynthesis" in journal_data: payload["aiSynthesis"] = journal_data["aiSynthesis"]
+
+            self.client.mutation("journals:updateJournal", payload)
+            return True
+        except Exception as e:
+            logger.error(f"🔴 Ошибка journals:updateJournal: {str(e)}")
             return False
 
     def delete_journal(self, entry_id: str) -> bool:
