@@ -71,7 +71,7 @@
 
 ---
 
-## 🚀 5. Точка Останова — 12 Августа 2026 г.
+## 🚀 5. Точка Останова — 2 Сентября 2026 г.
 * **Выход из Точки Останова и Аудит ИИ-Провайдеров**:
   * Очищены устаревшие модели (`gemini-1.5-pro`, `gemini-2.0-flash-exp`).
   * Подключена живая динамическая выгрузка актуальных текстовых моделей для Google Gemini API (`google.genai`), Anthropic Claude API и Mistral AI API.
@@ -103,4 +103,5 @@
   * Интегрирована автоматическая санитизация вывода в клиентах `gemini_client.py`, `anthropic_client.py`, `mistral_client.py` и основном модуле `app.py`.
 * **Синхронизация и Публикация**:
   * Проект зафиксирован в GitHub-репозитории `origin main` и официально опубликован в глобальной сети: [https://citadel-oracle.streamlit.app](https://citadel-oracle.streamlit.app).
+
 
