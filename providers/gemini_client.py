@@ -1,13 +1,13 @@
-# providers/gemini_client.py
 import os
 from google import genai
 from google.genai import types
 from dotenv import load_dotenv
 from typing import Generator, List, Dict, Optional
+from providers.security import sanitize_markdown
 
 load_dotenv()
 
-def ask_gemini(prompt: str, model_name: str = "gemini-2.5-flash") -> str:
+def ask_gemini(prompt: str, model_name: str = "gemini-2.5-flash", system_prompt: Optional[str] = None) -> str:
     """
     Отправляет запрос к Google Gemini и возвращает ответ (синхронно).
     """
@@ -17,11 +17,15 @@ def ask_gemini(prompt: str, model_name: str = "gemini-2.5-flash") -> str:
 
     try:
         client = genai.Client(api_key=api_key)
+        config = types.GenerateContentConfig(
+            system_instruction=system_prompt
+        ) if system_prompt else None
         response = client.models.generate_content(
             model=model_name,
             contents=prompt,
+            config=config
         )
-        return response.text
+        return sanitize_markdown(response.text)
     except Exception as e:
         return f"Ошибка генерации Gemini: {str(e)}"
 

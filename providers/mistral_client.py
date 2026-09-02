@@ -1,12 +1,13 @@
 import os
 from mistralai.client import Mistral
 from dotenv import load_dotenv
-from typing import Generator, List, Dict
+from typing import Generator, List, Dict, Optional
+from providers.security import sanitize_markdown
 
 # Загружаем ключи из .env
 load_dotenv()
 
-def ask_mistral(prompt: str, model_name: str = "mistral-large-latest") -> str:
+def ask_mistral(prompt: str, model_name: str = "mistral-large-latest", system_prompt: Optional[str] = None) -> str:
     """
     Отправляет запрос к Mistral AI и возвращает ответ (синхронно).
     """
@@ -16,12 +17,17 @@ def ask_mistral(prompt: str, model_name: str = "mistral-large-latest") -> str:
 
     client = Mistral(api_key=api_key)
 
+    messages = []
+    if system_prompt:
+        messages.append({"role": "system", "content": system_prompt})
+    messages.append({"role": "user", "content": prompt})
+
     response = client.chat.complete(
         model=model_name,
-        messages=[{"role": "user", "content": prompt}]
+        messages=messages
     )
 
-    return response.choices[0].message.content
+    return sanitize_markdown(response.choices[0].message.content)
 
 
 def stream_mistral(messages: List[Dict[str, str]], model_name: str, temperature: float, max_tokens: int) -> Generator[str, None, None]:

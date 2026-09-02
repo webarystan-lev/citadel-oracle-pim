@@ -2,10 +2,41 @@ import base64
 import hashlib
 import logging
 import os
+import re
 from google import genai
 from cryptography.fernet import Fernet
 
 logger = logging.getLogger("PIMSecurity")
+
+def sanitize_markdown(text: str) -> str:
+    """
+    Очищает и форматирует Markdown-текст, сжимая аномальные повторы символов
+    (дефисы, тире, подчеркивания, знаки равенства, пробелы), которые могут
+    вызывать зависание браузера или ломать верстку таблиц.
+    """
+    if not text:
+        return ""
+    
+    # 1. Сжатие длинных разделителей в таблицах :----: или :--- или ---:
+    text = re.sub(r':-{3,}:', ':---:', text)
+    text = re.sub(r':-{3,}', ':---', text)
+    text = re.sub(r'-{3,}:', '---:', text)
+    
+    # 2. Сжатие любых длинных последовательностей дефисов/тире (4 и более подряд)
+    text = re.sub(r'[-—–]{4,}', '---', text)
+    
+    # 3. Сжатие длинных цепочек подчеркиваний и знаков равенства
+    text = re.sub(r'_{4,}', '___', text)
+    text = re.sub(r'={4,}', '===', text)
+    
+    # 4. Сжатие многоточий (более 3 точек подряд)
+    text = re.sub(r'\.{4,}', '...', text)
+    
+    # 5. Сжатие аномально длинных цепочек пробелов (более 8 подряд)
+    text = re.sub(r'[ ]{8,}', '    ', text)
+    
+    return text
+
 
 def derive_fernet_key(secret_passphrase: str) -> bytes:
     """Генерирует 32-байтный URL-safe Base64 ключ Fernet из секретной фразы."""

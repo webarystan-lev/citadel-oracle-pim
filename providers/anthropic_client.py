@@ -1,12 +1,13 @@
 import os
 from anthropic import Anthropic
 from dotenv import load_dotenv
-from typing import Generator, List, Dict
+from typing import Generator, List, Dict, Optional
+from providers.security import sanitize_markdown
 
 # Загружаем ключи из .env
 load_dotenv()
 
-def ask_anthropic(prompt: str, model_name: str = "claude-3-5-sonnet-20240620") -> str:
+def ask_anthropic(prompt: str, model_name: str = "claude-3-5-sonnet-20240620", system_prompt: Optional[str] = None) -> str:
     """
     Отправляет запрос к Anthropic Claude и возвращает ответ (синхронно).
     """
@@ -16,14 +17,18 @@ def ask_anthropic(prompt: str, model_name: str = "claude-3-5-sonnet-20240620") -
 
     client = Anthropic(api_key=api_key)
 
-    response = client.messages.create(
-        model=model_name,
-        max_tokens=500,
-        messages=[{"role": "user", "content": prompt}]
-    )
+    kwargs = {
+        "model": model_name,
+        "max_tokens": 4096,
+        "messages": [{"role": "user", "content": prompt}]
+    }
+    if system_prompt:
+        kwargs["system"] = system_prompt
+
+    response = client.messages.create(**kwargs)
 
     # Ответ приходит в виде списка блоков
-    return response.content[0].text
+    return sanitize_markdown(response.content[0].text)
 
 
 def stream_anthropic(messages: List[Dict[str, str]], model_name: str, temperature: float, max_tokens: int) -> Generator[str, None, None]:

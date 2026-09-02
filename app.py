@@ -17,7 +17,7 @@ sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 import streamlit as st
 from providers import anthropic_client, gemini_client, mistral_client, convex_client
 from providers.convex_client import ConvexBridge
-from providers.security import encrypt_secret, decrypt_secret, verify_gemini_api_key
+from providers.security import encrypt_secret, decrypt_secret, verify_gemini_api_key, sanitize_markdown
 
 # Настройка страницы
 st.set_page_config(
@@ -542,7 +542,10 @@ DEFAULT_SYSTEM = (
     "Ты — Ведущий ИИ-Архитектор и Персональный Оракул Цитадели («The Spirit of the Shekinah Citadel Oracle»). "
     "Ты являешься цифровым соратником и интеллектуальным помощником Льва Николаевича — "
     "пастора, миссионера («Миссия Шехина») и руководителя «Web Development Studio Web Arystan». "
-    "Твой слог уважителен, академичен, глубок и исполнен духовной и технической мудрости."
+    "Твой слог уважителен, академичен, глубок и исполнен духовной и технической мудрости. "
+    "Форматируй ответы в чистом, структурированном Markdown. При создании таблиц Markdown используй компактные "
+    "разделители (ровно по 3-4 дефиса на столбец, например | :--- | :--- |), никогда не выводи длинные повторяющиеся "
+    "цепочки дефисов или символов-заполнителей."
 )
 
 def get_model_signature_block(model_name: str, provider_name: str) -> str:
@@ -969,7 +972,7 @@ if active_tab == "💬 ИИ-Чат & Оракул":
                             system_prompt=chat.get('system_prompt', DEFAULT_SYSTEM)
                         ))
                 
-                st.markdown(content)
+                st.markdown(sanitize_markdown(content))
                 render_copy_expander(content, "📋 Скопировать ответ модели")
 
     # 📍 Якорь конца чата и кнопка возврата в начало
@@ -1069,7 +1072,7 @@ if active_tab == "💬 ИИ-Чат & Оракул":
                         <span class="thinking-timer">⏱️ {elapsed:.1f} сек</span>
                     </div>
                     """, unsafe_allow_html=True)
-                    msg_placeholder.markdown(full_response + "▌")
+                    msg_placeholder.markdown(sanitize_markdown(full_response) + "▌")
 
                 total_elapsed = round(time.time() - start_time, 2)
                 
@@ -1077,6 +1080,8 @@ if active_tab == "💬 ИИ-Чат & Оракул":
                 if full_response and not full_response.startswith("🔴"):
                     sig_block = get_model_signature_block(model, provider)
                     full_response += sig_block
+
+                full_response = sanitize_markdown(full_response)
 
                 # Очищаем живой анимированный статус
                 thinking_placeholder.empty()
@@ -1536,15 +1541,16 @@ elif active_tab == "📖 Журнал":
     # Вывод результата генерации во всю ширину
     saved_ai_res = st.session_state.get(f"ai_journal_res_{active_nb['id']}", "")
     if saved_ai_res:
+        clean_ai_res = sanitize_markdown(saved_ai_res)
         st.markdown("---")
         st.markdown("#### 📜 Результат ИИ-Анализа и Духовной Рефлексии:")
         st.markdown("<div style='background: rgba(17, 24, 39, 0.85); padding: 25px; border-radius: 12px; border: 1px solid rgba(147, 51, 234, 0.4); box-shadow: 0 4px 20px rgba(0,0,0,0.4);'>", unsafe_allow_html=True)
-        st.markdown(saved_ai_res)
+        st.markdown(clean_ai_res)
         st.markdown("</div>", unsafe_allow_html=True)
 
         col_act_copy, col_act_clear = st.columns([3, 1])
         with col_act_copy:
-            render_copy_expander(saved_ai_res, "📋 Скопировать ИИ-Рефлексию в буфер обмена")
+            render_copy_expander(clean_ai_res, "📋 Скопировать ИИ-Рефлексию в буфер обмена")
         with col_act_clear:
             if st.button("🗑️ Очистить ответ ИИ", key=f"clear_ai_res_{active_nb['id']}", use_container_width=True):
                 st.session_state[f"ai_journal_res_{active_nb['id']}"] = ""
