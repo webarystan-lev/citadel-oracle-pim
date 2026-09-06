@@ -79,7 +79,6 @@ def list_available_anthropic_models() -> List[str]:
     if not api_key:
         return []
     try:
-        from anthropic import Anthropic
         client = Anthropic(api_key=api_key)
         # Проверяем наличие метода list
         if hasattr(client, 'models') and hasattr(client.models, 'list'):

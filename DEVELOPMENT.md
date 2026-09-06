@@ -17,7 +17,7 @@ citadel-oracle-pim/
 ├── .envrc                  # direnv конфигурация для автоактивации .venv
 ├── .venv/                  # Изолированное виртуальное окружение Python
 ├── app.py                  # Главное Streamlit-приложение (Gatekeeper + Авторизация + Все 6 Модулей)
-├── requirements.txt        # Версии зависимостей Python (google-genai, streamlit==1.58.0, convex==0.7.0)
+├── requirements.txt        # Версии зависимостей Python (google-genai==2.22.0, streamlit==1.58.0, convex==0.7.0)
 ├── package.json            # npm конфигурация Convex DB
 ├── convex/                 # TypeScript бэкенд Convex DB
 │   ├── schema.ts           # Расширенная схема PIM (chats, messages, notebooks, journals, projects, notes, vault)
@@ -72,6 +72,19 @@ citadel-oracle-pim/
 npx convex dev --once   # Для среды разработки
 npx convex deploy       # Для боевой среды (Production)
 ```
+
+> **Архитектурный дуализм версий Convex**:
+> * **Python Слой (`convex==0.7.0`)**: клиентский мост (`ConvexBridge` в `providers/convex_client.py`) для вызова мутаций и запросов из Streamlit.
+> * **Node.js/TypeScript Слой (`convex ^1.42.1`)**: серверная часть в каталоге `convex/` (`schema.ts`, обработчики) и CLI-инструментарий разработчика.
+
+---
+
+## 🔮 Перспективный План Развития (Future Roadmap)
+
+По итогам соборного аудита экспертов (**NVIDIA Nemotron 3 Ultra** — 9.5/10 и **Mistral Medium 3.5** — 9.7/10), монолитный файл `app.py` и текущая архитектура признаны образцовыми и надежными в работе. На будущее при расширении функционала запланировано:
+1. **Модульная декомпозиция представлений**: выделение отдельных представлений (`views/chat.py`, `views/journal.py`, `views/projects.py`, `views/notes.py`, `views/vault.py`) при сохранении единого роутера в `app.py`.
+2. **Вынос CSS-стилей**: перемещение `CITADEL_CSS` в статический ассет `assets/citadel.css` с подгрузкой через `st.html`.
+3. **Расширение провайдеров**: интеграция дополнительных ИИ-шлюзов по мере необходимости.
 
 ---
 

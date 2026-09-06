@@ -77,7 +77,6 @@ def list_available_mistral_models() -> List[str]:
     if not api_key:
         return []
     try:
-        from mistralai.client import Mistral
         client = Mistral(api_key=api_key)
         models_list = client.models.list()
         ignored_keywords = ["embed", "ocr", "moderation", "tts", "transcribe", "realtime"]

@@ -309,30 +309,31 @@ CITADEL_CSS = """
 st.markdown(CITADEL_CSS, unsafe_allow_html=True)
 
 # Глобальный JS-скрипт копирования в буфер обмена
-st.components.v1.html("""
+st.html("""
 <script>
-if (window.parent && !window.parent.citadelCopyB64) {
-    window.parent.citadelCopyB64 = function(btn, b64) {
+var targetWin = window.parent || window;
+if (!targetWin.citadelCopyB64) {
+    targetWin.citadelCopyB64 = function(btn, b64) {
         try {
             var bin = atob(b64);
             var bytes = new Uint8Array(bin.length);
             for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
             var txt = new TextDecoder('utf-8').decode(bytes);
             
-            var ta = window.parent.document.createElement('textarea');
+            var ta = (targetWin.document || document).createElement('textarea');
             ta.value = txt;
             ta.style.position = 'fixed';
             ta.style.opacity = '0';
             ta.style.pointerEvents = 'none';
-            window.parent.document.body.appendChild(ta);
+            (targetWin.document || document).body.appendChild(ta);
             ta.focus();
             ta.select();
             var ok = false;
-            try { ok = window.parent.document.execCommand('copy'); } catch(e){ ok = false; }
-            window.parent.document.body.removeChild(ta);
+            try { ok = (targetWin.document || document).execCommand('copy'); } catch(e){ ok = false; }
+            (targetWin.document || document).body.removeChild(ta);
             
-            if (!ok && window.parent.navigator.clipboard) {
-                window.parent.navigator.clipboard.writeText(txt);
+            if (!ok && targetWin.navigator && targetWin.navigator.clipboard) {
+                targetWin.navigator.clipboard.writeText(txt);
                 ok = true;
             }
             
@@ -352,11 +353,11 @@ if (window.parent && !window.parent.citadelCopyB64) {
         }
     };
 }
-if (!window.citadelCopyB64 && window.parent && window.parent.citadelCopyB64) {
-    window.citadelCopyB64 = window.parent.citadelCopyB64;
+if (!window.citadelCopyB64 && targetWin.citadelCopyB64) {
+    window.citadelCopyB64 = targetWin.citadelCopyB64;
 }
 </script>
-""", height=0)
+""", unsafe_allow_javascript=True)
 
 # Ранги и Сигнатуры Моделей в Цитадели
 CITADEL_SIGNATURES = {

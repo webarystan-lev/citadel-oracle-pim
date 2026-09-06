@@ -64,7 +64,7 @@ cd citadel-oracle-pim
 1. **Создайте и активируйте виртуальное окружение**:
    ```bash
    python3 -m venv .venv
-   source .venv/bin/activate
+   source .venv/bin/activate.fish
    ```
 
 2. **Установите требуемые Python-пакеты**:
@@ -75,18 +75,23 @@ cd citadel-oracle-pim
 
    *Содержимое `requirements.txt`:*
    * `streamlit==1.58.0`
-   * `google-genai`
+   * `google-genai==2.22.0`
    * `anthropic==0.116.0`
    * `mistralai==2.5.2`
-   * `cryptography==42.0.8`
-   * `convex==0.7.0`
    * `python-dotenv==1.2.2`
+   * `pyperclip==1.9.0`
+   * `convex==0.7.0` (клиентский Python SDK)
+   * `cryptography==42.0.8`
 
 ---
 
 ### Шаг 3. Инициализация и Настройка Облачной Бэкенд-БД Convex DB
 
-Система использует **Convex DB** для синхронизации всех данных (чаты, журналы, проекты, заметки, сейф).
+Система использует **Convex DB** для синхронизации всех данных (чаты, журналы, блокноты, проекты, заметки, сейф).
+
+> **Примечание об архитектурном дуализме версий Convex:**
+> * **Python Слой (`convex==0.7.0`)**: официальный клиентский мост (`ConvexBridge` в `providers/convex_client.py`) для выполнения запросов и мутаций из среды Python/Streamlit.
+> * **Node.js/TypeScript Слой (`convex: ^1.42.1` в `package.json`)**: серверная схема данных, обработчики в каталоге `convex/` и CLI-инструментарий развертывания.
 
 1. **Установите Node-зависимости**:
    ```bash
