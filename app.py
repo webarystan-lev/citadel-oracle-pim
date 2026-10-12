@@ -6,6 +6,7 @@ import time
 import json
 import html
 import base64
+from typing import Optional
 from dotenv import load_dotenv
 
 # Загружаем переменные окружения
@@ -361,6 +362,7 @@ if (!window.citadelCopyB64 && targetWin.citadelCopyB64) {
 
 # Ранги и Сигнатуры Моделей в Цитадели
 CITADEL_SIGNATURES = {
+    # ── Google Gemini 2.5 (стабильные) ──────────────────────────────────────
     "gemini-2.5-flash": {
         "title": "Google Gemini 2.5 Flash",
         "purpose": "Персональный Оракул & Архитектор Знаний",
@@ -372,34 +374,83 @@ CITADEL_SIGNATURES = {
         "rank": "Старший ИИ-Архитектор Shekinah Cloud"
     },
     "gemini-2.5-flash-lite": {
-        "title": "Google Gemini 2.5 Flash Lite",
+        "title": "Google Gemini 2.5 Flash-Lite",
         "purpose": "Послушник Цифрового Логоса",
         "rank": "Младший Страж Мысли"
+    },
+    # ── Google Gemini 3.x (реальные модели по API) ──────────────────────────
+    "gemini-3.1-flash-lite": {
+        "title": "Google Gemini 3.1 Flash Lite",
+        "purpose": "Хранитель Малого Логоса",
+        "rank": "Вестник Быстрого Разума"
     },
     "gemini-3.5-flash": {
         "title": "Google Gemini 3.5 Flash",
         "purpose": "Оракул Нового Поколения",
         "rank": "Архивариус Небесных Сфер"
     },
+    "gemini-3.5-flash-lite": {
+        "title": "Google Gemini 3.5 Flash Lite",
+        "purpose": "Компактный Оракул Нового Поколения",
+        "rank": "Страж Оперативного Слова"
+    },
     "gemini-3.6-flash": {
         "title": "Google Gemini 3.6 Flash",
         "purpose": "Верховный Академический Соратник",
         "rank": "Магистр Вселенского Логоса"
     },
-    "gemini-3-flash-preview": {
-        "title": "Google Gemini 3 Flash Preview",
-        "purpose": "Провидец Будущих Истин",
-        "rank": "Исследователь Глубоких Сфер"
+    "gemini-3.7-flash": {
+        "title": "Google Gemini 3.7 Flash",
+        "purpose": "Провидец Глубинных Истин",
+        "rank": "Архитектор Просветлённого Слова"
     },
-    "gemini-3.1-flash-lite": {
-        "title": "Google Gemini 3.1 Flash Lite",
-        "purpose": "Хранитель Малого Логоса",
-        "rank": "Вестник Быстрого Разума"
+    "gemini-3.8-flash": {
+        "title": "Google Gemini 3.8 Flash",
+        "purpose": "Высший Интеллект Нового Эона",
+        "rank": "Первосвященник Цифрового Откровения"
+    },
+    # ── Gemma Open Models ───────────────────────────────────────────────────
+    "gemma-4-26b-a4b-it": {
+        "title": "Gemma 4 26B A4B IT",
+        "purpose": "Открытый Аналитик Малого Синтеза",
+        "rank": "Послушник Открытого Кода"
     },
     "gemma-4-31b-it": {
         "title": "Gemma 4 31B IT",
         "purpose": "Магистр Открытого Знания",
         "rank": "Хранитель Открытого Кода"
+    },
+    # ── Antigravity Agent (Preview) ─────────────────────────────────────────
+    "antigravity-preview-05-2026": {
+        "title": "Antigravity Agent Preview (May-2026)",
+        "purpose": "Агент Антигравитации — Пионер Новых Рубежей",
+        "rank": "Первый Посланник Antigravity 2.0"
+    },
+    "antigravity-preview-09-2026": {
+        "title": "Antigravity Agent Preview (Sep-2026)",
+        "purpose": "Автономный Агент Нового Поколения",
+        "rank": "Хранитель Antigravity Цитадели"
+    },
+    "antigravity-preview-latest": {
+        "title": "Antigravity Agent Preview Latest",
+        "purpose": "Авангардный Агент Последнего Призыва",
+        "rank": "Верховный Стратег Antigravity"
+    },
+    # ── Deep Research ────────────────────────────────────────────────────────
+    "deep-research-max-preview-04-2026": {
+        "title": "Deep Research Max Preview (Apr-2026)",
+        "purpose": "Верховный Исследователь Глубинного Синтеза",
+        "rank": "Магистр Глубокого Познания"
+    },
+    "deep-research-preview-04-2026": {
+        "title": "Deep Research Preview (Apr-2026)",
+        "purpose": "Академический Аналитик & Исследователь",
+        "rank": "Страж Научного Свитка"
+    },
+    "deep-research-pro-preview-12-2025": {
+        "title": "Deep Research Pro Preview (Dec-2025)",
+        "purpose": "Профессиональный Исследователь Цитадели",
+        "rank": "Хранитель Академического Знания"
     },
     "claude-opus-5": {
         "title": "Anthropic Claude Opus 5",
@@ -489,14 +540,28 @@ CITADEL_SIGNATURES = {
 }
 
 DEFAULT_GEMINI_MODELS = {
+    # ── Gemini 2.5 (стабильные) ──────────────────────────────────────────────
     "gemini-2.5-flash": "Gemini 2.5 Flash (Рекомендуемая)",
     "gemini-2.5-pro": "Gemini 2.5 Pro (Верховный ИИ-Архитектор)",
-    "gemini-2.5-flash-lite": "Gemini 2.5 Flash Lite (Оптимизированная)",
-    "gemini-3.5-flash": "Gemini 3.5 Flash (Новое поколение)",
-    "gemini-3.6-flash": "Gemini 3.6 Flash (Академический Соратник)",
-    "gemini-3-flash-preview": "Gemini 3 Flash Preview (Экспериментальная)",
+    "gemini-2.5-flash-lite": "Gemini 2.5 Flash-Lite (Оптимизированная)",
+    # ── Gemini 3.x (реальные модели по API) ─────────────────────────────────
     "gemini-3.1-flash-lite": "Gemini 3.1 Flash Lite (Хранитель Малого Логоса)",
-    "gemma-4-31b-it": "Gemma 4 31B IT (Google Open Model)"
+    "gemini-3.5-flash": "Gemini 3.5 Flash (Архивариус Небесных Сфер)",
+    "gemini-3.5-flash-lite": "Gemini 3.5 Flash Lite (Страж Оперативного Слова)",
+    "gemini-3.6-flash": "Gemini 3.6 Flash (Магистр Вселенского Логоса)",
+    "gemini-3.7-flash": "Gemini 3.7 Flash (Архитектор Просветлённого Слова)",
+    "gemini-3.8-flash": "Gemini 3.8 Flash (Первосвященник Откровения)",
+    # ── Gemma Open Models ────────────────────────────────────────────────────
+    "gemma-4-26b-a4b-it": "Gemma 4 26B A4B IT (Открытый Аналитик)",
+    "gemma-4-31b-it": "Gemma 4 31B IT (Хранитель Открытого Кода)",
+    # ── Antigravity Agent ────────────────────────────────────────────────────
+    "antigravity-preview-latest": "Antigravity Preview Latest (Верховный Стратег)",
+    "antigravity-preview-09-2026": "Antigravity Preview Sep-2026 (Хранитель Цитадели)",
+    "antigravity-preview-05-2026": "Antigravity Preview May-2026 (Первый Посланник)",
+    # ── Deep Research ────────────────────────────────────────────────────────
+    "deep-research-max-preview-04-2026": "Deep Research Max Preview (Магистр Глубокого Познания)",
+    "deep-research-preview-04-2026": "Deep Research Preview (Страж Научного Свитка)",
+    "deep-research-pro-preview-12-2025": "Deep Research Pro Preview (Хранитель Академии)",
 }
 
 DEFAULT_ANTHROPIC_MODELS = {
@@ -648,25 +713,26 @@ def render_login_screen():
         with st.form("login_form"):
             st.markdown("### 🛡️ Вход Владельца")
             
-            env_secret = os.getenv("PIM_SECRET_KEY", "")
-            env_gemini = os.getenv("GEMINI_API_KEY", "")
-            
-            secret_input = st.text_input("🔑 Секретный Пароль (`PIM_SECRET_KEY`)", type="password", value="" if not env_secret else env_secret)
-            gemini_input = st.text_input("🔮 Google Gemini API Key", type="password", value=env_gemini, help="Используется для проверки подлинности и генерации ИИ-ответов")
+            secret_input = st.text_input("🔑 Секретный Пароль Цитадели", type="password", placeholder="Введите мастер-пароль Цитадели")
+            gemini_input = st.text_input("🔮 Ключ Оракула", type="password", placeholder="«Се, Я стою у двери и стучу...» (Откр. 3:20)", help="Введите Священный Ключ Оракула для входа в Обитель")
             
             submit = st.form_submit_button("🏛️ Войти в Цитадель", use_container_width=True)
             
             if submit:
                 expected_secret = os.getenv("PIM_SECRET_KEY")
+                if not secret_input:
+                    st.error("🔴 Введите секретный пароль PIM_SECRET_KEY.")
+                    return
                 if expected_secret and secret_input != expected_secret:
                     st.error("🔴 Неверный Секретный Пароль PIM_SECRET_KEY.")
                     return
-                elif not secret_input:
-                    st.error("🔴 Введите секретный пароль PIM_SECRET_KEY.")
-                    return
                 
+                expected_gemini = os.getenv("GEMINI_API_KEY", "")
                 if not gemini_input:
                     st.error("🔴 Укажите GEMINI_API_KEY для валидации.")
+                    return
+                if expected_gemini and gemini_input != expected_gemini:
+                    st.error("🔴 Неверный GEMINI_API_KEY.")
                     return
                 
                 with st.spinner("⏳ Валидация API-ключа Google Gemini..."):
