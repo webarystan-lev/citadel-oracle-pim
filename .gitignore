@@ -21,6 +21,7 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 .streamlit/config.toml
+app.py.bak*
 
 # ─── ИНСТРУМЕНТЫ ИИ-РАЗРАБОТКИ И АВТОНОМНЫЕ АГЕНТЫ (AIDER, DEVIN, QWEN, ETC.) ─
 # Aider AI (Логи чатов, настройки и локальная история изменений)
@@ -65,7 +66,6 @@ antigravity.log
 node_modules/
 .convex/
 convex/_generated/
-package-lock.json
 
 
 .env.local

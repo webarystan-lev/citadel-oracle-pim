@@ -13,7 +13,7 @@ def ask_gemini(prompt: str, model_name: str = "gemini-2.5-flash", system_prompt:
     """
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
-        return "Ошибка: не найден GEMINI_API_KEY в .env"
+        raise RuntimeError("Не настроен GEMINI_API_KEY.")
 
     try:
         client = genai.Client(api_key=api_key)
@@ -27,7 +27,7 @@ def ask_gemini(prompt: str, model_name: str = "gemini-2.5-flash", system_prompt:
         )
         return sanitize_markdown(response.text)
     except Exception as e:
-        return f"Ошибка генерации Gemini: {str(e)}"
+        raise RuntimeError("Ошибка генерации Gemini; проверьте настройки API и подключение.") from e
 
 # Псевдоним для совместимости
 generate_gemini_content = ask_gemini
@@ -45,8 +45,7 @@ def stream_gemini(
     """
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
-        yield "Ошибка: не найден GEMINI_API_KEY в .env"
-        return
+        raise RuntimeError("Не настроен GEMINI_API_KEY.")
 
     contents = []
     system_instruction = system_prompt
@@ -78,13 +77,10 @@ def stream_gemini(
             config=generation_config
         )
         for chunk in response:
-            try:
-                if chunk.text:
-                    yield chunk.text
-            except Exception:
-                pass
+            if chunk.text:
+                yield chunk.text
     except Exception as e:
-        yield f"\n[Ошибка генерации Gemini: {str(e)}]"
+        raise RuntimeError("Ошибка потоковой генерации Gemini; проверьте настройки API и подключение.") from e
 
 # Псевдоним для совместимости
 stream_gemini_response = stream_gemini

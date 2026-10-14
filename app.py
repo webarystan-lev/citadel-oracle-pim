@@ -6,6 +6,7 @@ import time
 import json
 import html
 import base64
+import hmac
 from typing import Optional
 from dotenv import load_dotenv
 
@@ -720,18 +721,24 @@ def render_login_screen():
             
             if submit:
                 expected_secret = os.getenv("PIM_SECRET_KEY")
+                if not expected_secret:
+                    st.error("🔴 PIM_SECRET_KEY не настроен на сервере; вход отключён.")
+                    return
                 if not secret_input:
                     st.error("🔴 Введите секретный пароль PIM_SECRET_KEY.")
                     return
-                if expected_secret and secret_input != expected_secret:
+                if not hmac.compare_digest(secret_input, expected_secret):
                     st.error("🔴 Неверный Секретный Пароль PIM_SECRET_KEY.")
                     return
                 
                 expected_gemini = os.getenv("GEMINI_API_KEY", "")
+                if not expected_gemini:
+                    st.error("🔴 GEMINI_API_KEY не настроен на сервере; вход отключён.")
+                    return
                 if not gemini_input:
                     st.error("🔴 Укажите GEMINI_API_KEY для валидации.")
                     return
-                if expected_gemini and gemini_input != expected_gemini:
+                if not hmac.compare_digest(gemini_input, expected_gemini):
                     st.error("🔴 Неверный GEMINI_API_KEY.")
                     return
                 
@@ -741,7 +748,6 @@ def render_login_screen():
                         st.session_state.authenticated = True
                         st.session_state.master_passphrase = secret_input
                         st.session_state.gemini_key = gemini_input
-                        os.environ["GEMINI_API_KEY"] = gemini_input
                         st.success(f"✅ {msg}")
                         st.toast("✨ Добро пожаловать в обитель, Лев Николаевич!")
                         time.sleep(1)
@@ -753,7 +759,14 @@ if not st.session_state.authenticated:
     render_login_screen()
     st.stop()
 
+if not bridge.is_active:
+    st.error(
+        "🔴 Облачное хранилище не подключено. Существующие записи в Convex не удалены, "
+        "но сейчас недоступны. Не создавайте новые записи до восстановления соединения."
+    )
+
 # ==================== ОСНОВНОЙ ИНТЕРФЕЙС ПОСЛЕ АВТОРИЗАЦИИ ====================
+bridge.last_error = None
 
 # Инициализация локальных структур данных
 if "chats" not in st.session_state:
@@ -781,7 +794,8 @@ if "current_chat_id" not in st.session_state or not st.session_state.current_cha
         st.session_state.chats[new_id] = new_chat
         st.session_state.current_chat_id = new_id
         if bridge.is_active:
-            bridge.save_chat(new_id, new_chat)
+            if not bridge.save_chat(new_id, new_chat):
+                st.error("🔴 Не удалось создать чат в облачном хранилище.")
     else:
         st.session_state.current_chat_id = list(st.session_state.chats.keys())[0]
 
@@ -830,7 +844,8 @@ with st.sidebar:
                 st.session_state.chats[n_id] = n_chat
                 st.session_state.current_chat_id = n_id
                 if bridge.is_active:
-                    bridge.save_chat(n_id, n_chat)
+                    if not bridge.save_chat(n_id, n_chat):
+                        st.error("🔴 Чат создан только в текущей сессии: облачное сохранение не удалось.")
                 st.rerun()
                 
         with col_c2:
@@ -839,7 +854,8 @@ with st.sidebar:
                 if cur_id in st.session_state.chats:
                     del st.session_state.chats[cur_id]
                     if bridge.is_active:
-                        bridge.delete_chat(cur_id)
+                        if not bridge.delete_chat(cur_id):
+                            st.error("🔴 Не удалось удалить чат из облачного хранилища.")
                     st.session_state.current_chat_id = list(st.session_state.chats.keys())[0] if st.session_state.chats else None
                     st.rerun()
 
@@ -918,8 +934,8 @@ with st.sidebar:
         new_title = st.text_input("Название чата", value=chat.get("title", "Диалог"))
         if new_title != chat.get("title"):
             chat["title"] = new_title
-            if bridge.is_active:
-                bridge.rename_chat(current_id, new_title)
+            if bridge.is_active and not bridge.rename_chat(current_id, new_title):
+                st.warning("Не удалось обновить название чата в облачном хранилище.")
                 
         # 4. Температура
         new_temp = st.slider("Температура (Креативность)", 0.0, 1.0, float(chat.get("temperature", 0.7)), 0.05)
@@ -934,10 +950,11 @@ with st.sidebar:
         chat["system_prompt"] = new_sys
         
         # Сохранение и Скачивание
-        if st.button("💾 Сохранить настройки чата", use_container_width=True):
-            if bridge.is_active:
-                bridge.save_chat(current_id, chat)
-            st.toast("✅ Настройки сохранены!")
+        if st.button("💾 Сохранить настройки чата", use_container_width=True, disabled=not bridge.is_active):
+            if bridge.save_chat(current_id, chat):
+                st.toast("✅ Настройки сохранены!")
+            else:
+                st.error("🔴 Не удалось сохранить настройки чата.")
 
         md_content = export_chat_to_markdown(chat)
         st.download_button(
@@ -952,10 +969,11 @@ with st.sidebar:
     if bridge.is_active:
         st.caption("🟢 **Convex DB**: Облачная синхронизация активна")
     else:
-        st.caption("🟡 **Convex DB**: Автономный In-Memory режим")
+        st.warning("☁️ Облачное хранилище не настроено. Чаты доступны только до завершения текущей сессии; операции с данными отключены.")
         
     if st.button("🚪 Выйти из системы", use_container_width=True):
-        st.session_state.authenticated = False
+        for key in ("authenticated", "master_passphrase", "gemini_key"):
+            st.session_state.pop(key, None)
         st.rerun()
 
 # ==================== РАЗДЕЛ 1: ИИ-ЧАТ & ОРАКУЛ ====================
@@ -1072,8 +1090,8 @@ if active_tab == "💬 ИИ-Чат & Оракул":
             
         # 2. Сохраняем параметры чата и сообщение в Convex DB
         if bridge.is_active:
-            bridge.save_chat(current_id, chat)
-            bridge.add_message(current_id, user_msg)
+            if not bridge.save_chat(current_id, chat) or not bridge.add_message(current_id, user_msg):
+                st.error("🔴 Не удалось сохранить вопрос в облачное хранилище.")
             
         with st.chat_message("user", avatar="👤"):
             st.markdown("**💬 Ваш вопрос:**")
@@ -1085,6 +1103,7 @@ if active_tab == "💬 ИИ-Чат & Оракул":
             msg_placeholder = st.empty()
             
             full_response = ""
+            generation_succeeded = False
             start_time = time.time()
             
             provider = chat.get("provider", "Google Gemini")
@@ -1149,6 +1168,7 @@ if active_tab == "💬 ИИ-Чат & Оракул":
                     full_response += sig_block
 
                 full_response = sanitize_markdown(full_response)
+                generation_succeeded = True
 
                 # Очищаем живой анимированный статус
                 thinking_placeholder.empty()
@@ -1173,22 +1193,21 @@ if active_tab == "💬 ИИ-Чат & Оракул":
             except Exception as e:
                 total_elapsed = round(time.time() - start_time, 2)
                 thinking_placeholder.empty()
-                full_response = f"🔴 Ошибка генерации: {str(e)}"
-                reasoning_summary = f"🔴 Ошибка при обработке запроса: {str(e)}"
-                msg_placeholder.error(full_response)
+                msg_placeholder.error(f"🔴 Ошибка генерации: {e}")
 
-            asst_msg = {
-                "role": "assistant",
-                "content": full_response,
-                "thinking": reasoning_summary,
-                "meta": {
-                    "thinking_time": total_elapsed,
-                    "thinking": reasoning_summary
+            if generation_succeeded:
+                asst_msg = {
+                    "role": "assistant",
+                    "content": full_response,
+                    "thinking": reasoning_summary,
+                    "meta": {
+                        "thinking_time": total_elapsed,
+                        "thinking": reasoning_summary
+                    }
                 }
-            }
-            chat["messages"].append(asst_msg)
-            if bridge.is_active:
-                bridge.add_message(current_id, asst_msg)
+                chat["messages"].append(asst_msg)
+                if bridge.is_active and not bridge.add_message(current_id, asst_msg):
+                    st.error("🔴 Ответ получен, но не удалось сохранить его в облачное хранилище.")
             st.rerun()
 
 # ==================== РАЗДЕЛ 2: МНОГОФУНКЦИОНАЛЬНЫЕ ЖУРНАЛЫ (JOURNAL WITH GEMINI) ====================
@@ -1259,7 +1278,7 @@ elif active_tab == "📖 Журнал":
                 "GENERAL": "⭐ Общий профиль рефлексии"
             }[x])
 
-            if st.button("🚀 Создать Журнал", use_container_width=True):
+            if st.button("🚀 Создать Журнал", use_container_width=True, disabled=not bridge.is_active):
                 if new_nb_title:
                     nb_data = {
                         "id": str(uuid.uuid4()),
@@ -1268,11 +1287,12 @@ elif active_tab == "📖 Журнал":
                         "icon": new_nb_icon,
                         "categoryType": new_nb_cat_type
                     }
-                    if bridge.is_active:
-                        bridge.save_notebook(nb_data)
-                    st.success("✅ Журнал создан!")
-                    st.session_state.active_notebook_id = nb_data["id"]
-                    st.rerun()
+                    if bridge.save_notebook(nb_data):
+                        st.success("✅ Журнал создан!")
+                        st.session_state.active_notebook_id = nb_data["id"]
+                        st.rerun()
+                    else:
+                        st.error("🔴 Не удалось сохранить журнал в облачное хранилище.")
                 else:
                     st.warning("Введите название журнала.")
 
@@ -1328,7 +1348,7 @@ elif active_tab == "📖 Журнал":
                 st.info("Введите текст записи слева для предварительного просмотра.")
             st.markdown("</div>", unsafe_allow_html=True)
 
-        if st.button(f"💾 Сохранить в `{active_nb.get('title')}`", use_container_width=True, type="primary"):
+        if st.button(f"💾 Сохранить в `{active_nb.get('title')}`", use_container_width=True, type="primary", disabled=not bridge.is_active):
             if entry_content and entry_content.strip():
                 journal_data = {
                     "id": str(uuid.uuid4()),
@@ -1350,10 +1370,6 @@ elif active_tab == "📖 Журнал":
                         st.rerun()
                     else:
                         st.error("🔴 Ошибка сохранения в Convex DB.")
-                else:
-                    st.success("✅ Запись сохранена локально!")
-                    time.sleep(0.5)
-                    st.rerun()
             else:
                 st.warning("Заполните текст записи перед сохранением.")
 
@@ -1403,7 +1419,7 @@ elif active_tab == "📖 Журнал":
 
                         col_esave, col_ecancel = st.columns(2)
                         with col_esave:
-                            if st.button("💾 Сохранить", key=f"save_edit_{j_id}", type="primary", use_container_width=True):
+                            if st.button("💾 Сохранить", key=f"save_edit_{j_id}", type="primary", use_container_width=True, disabled=not bridge.is_active):
                                 updated_data = {
                                     "id": j_id,
                                     "notebookId": active_nb["id"],
@@ -1413,12 +1429,13 @@ elif active_tab == "📖 Журнал":
                                     "projectId": edit_proj_id,
                                     "tags": [t.strip() for t in edit_tags.split(",") if t.strip()]
                                 }
-                                if bridge.is_active:
-                                    bridge.update_journal(updated_data)
-                                st.session_state.editing_journal_id = None
-                                st.success("✅ Сохранено!")
-                                time.sleep(0.5)
-                                st.rerun()
+                                if bridge.update_journal(updated_data):
+                                    st.session_state.editing_journal_id = None
+                                    st.success("✅ Сохранено!")
+                                    time.sleep(0.5)
+                                    st.rerun()
+                                else:
+                                    st.error("🔴 Не удалось сохранить запись.")
 
                         with col_ecancel:
                             if st.button("❌ Отмена", key=f"cancel_edit_{j_id}", use_container_width=True):
@@ -1439,12 +1456,13 @@ elif active_tab == "📖 Журнал":
                                 st.session_state.editing_journal_id = j_id
                                 st.rerun()
                         with col_act2:
-                            if st.button("🗑️ Удалить", key=f"btn_del_{j_id}", use_container_width=True):
-                                if bridge.is_active:
-                                    bridge.delete_journal(j_id)
-                                st.success("🗑️ Запись удалена!")
-                                time.sleep(0.5)
-                                st.rerun()
+                            if st.button("🗑️ Удалить", key=f"btn_del_{j_id}", use_container_width=True, disabled=not bridge.is_active):
+                                if bridge.delete_journal(j_id):
+                                    st.success("🗑️ Запись удалена!")
+                                    time.sleep(0.5)
+                                    st.rerun()
+                                else:
+                                    st.error("🔴 Не удалось удалить запись.")
         else:
             st.info(f"В журнале «{active_nb.get('title')}» пока нет записей. Создайте первую запись слева.")
 
@@ -1637,7 +1655,7 @@ elif active_tab == "📁 Проекты":
             p_desc = st.text_area("Описание и Цели Проекта")
             p_milestones = st.text_area("Этапы / Milestones (Markdown)")
             p_tags = st.text_input("Теги (через запятую)", value="analog, angular, cloudflare")
-            p_submit = st.form_submit_button("🚀 Сохранить Проект")
+            p_submit = st.form_submit_button("🚀 Сохранить Проект", disabled=not bridge.is_active)
             
             if p_submit and p_title:
                 proj_data = {
@@ -1649,10 +1667,11 @@ elif active_tab == "📁 Проекты":
                     "milestones": p_milestones,
                     "tags": [t.strip() for t in p_tags.split(",") if t.strip()]
                 }
-                if bridge.is_active:
-                    bridge.save_project(proj_data)
-                st.success("Проект успешно создан!")
-                st.rerun()
+                if bridge.save_project(proj_data):
+                    st.success("Проект успешно создан!")
+                    st.rerun()
+                else:
+                    st.error("🔴 Не удалось сохранить проект в облачное хранилище.")
 
     st.markdown("---")
     projects = bridge.load_projects() if bridge.is_active else []
@@ -1662,16 +1681,26 @@ elif active_tab == "📁 Проекты":
         for idx, p in enumerate(projects):
             with cols[idx % 2]:
                 st.markdown("<div class='citadel-card'>", unsafe_allow_html=True)
-                status_class = f"badge-{p.get('status', 'active').lower()}"
-                st.markdown(f"### {p.get('title')} <span class='{status_class}'>{p.get('status')}</span>", unsafe_allow_html=True)
+                project_status = str(p.get("status", "Active"))
+                status_class = {
+                    "Active": "badge-active",
+                    "Planning": "badge-planning",
+                    "Completed": "badge-completed",
+                    "Archived": "badge-archived",
+                }.get(project_status, "badge-archived")
+                project_title = html.escape(str(p.get("title", "")))
+                safe_status = html.escape(project_status)
+                st.markdown(f"### {project_title} <span class='{status_class}'>{safe_status}</span>", unsafe_allow_html=True)
                 st.caption(f"📂 Категория: **{p.get('category')}**")
                 st.markdown(p.get("description", ""))
                 if p.get("milestones"):
                     with st.expander("🎯 Этапы и Milestones"):
                         st.markdown(p.get("milestones"))
-                if st.button("🗑️ Удалить проект", key=f"del_p_{p.get('id')}"):
-                    bridge.delete_project(p.get("id"))
-                    st.rerun()
+                if st.button("🗑️ Удалить проект", key=f"del_p_{p.get('id')}", disabled=not bridge.is_active):
+                    if bridge.delete_project(p.get("id")):
+                        st.rerun()
+                    else:
+                        st.error("🔴 Не удалось удалить проект.")
                 st.markdown("</div>", unsafe_allow_html=True)
     else:
         st.info("Проекты пока не добавлены.")
@@ -1689,7 +1718,7 @@ elif active_tab == "📝 Заметки":
         n_content = st.text_area("Содержимое (Markdown)", height=250, placeholder="Введите текст заметки...")
         n_tags = st.text_input("Теги", value="теология, исследование")
         
-        if st.button("💾 Сохранить Заметку", use_container_width=True):
+        if st.button("💾 Сохранить Заметку", use_container_width=True, disabled=not bridge.is_active):
             if n_title and n_content:
                 note_data = {
                     "id": str(uuid.uuid4()),
@@ -1699,10 +1728,11 @@ elif active_tab == "📝 Заметки":
                     "tags": [t.strip() for t in n_tags.split(",") if t.strip()],
                     "isArchived": False
                 }
-                if bridge.is_active:
-                    bridge.save_note(note_data)
-                st.success("✅ Заметка сохранена!")
-                st.rerun()
+                if bridge.save_note(note_data):
+                    st.success("✅ Заметка сохранена!")
+                    st.rerun()
+                else:
+                    st.error("🔴 Не удалось сохранить заметку в облачное хранилище.")
         st.markdown("</div>", unsafe_allow_html=True)
 
     with col_n2:
@@ -1712,9 +1742,11 @@ elif active_tab == "📝 Заметки":
             for n in notes:
                 with st.expander(f"📌 [{n.get('category')}] {n.get('title')}"):
                     st.markdown(n.get("content"))
-                    if st.button("🗑️ Удалить заметку", key=f"del_n_{n.get('id')}"):
-                        bridge.delete_note(n.get("id"))
-                        st.rerun()
+                    if st.button("🗑️ Удалить заметку", key=f"del_n_{n.get('id')}", disabled=not bridge.is_active):
+                        if bridge.delete_note(n.get("id")):
+                            st.rerun()
+                        else:
+                            st.error("🔴 Не удалось удалить заметку.")
         else:
             st.info("Заметки отсутствуют.")
 
@@ -1733,7 +1765,7 @@ elif active_tab == "🔐 Сейф Ключей":
             v_service = st.text_input("Сервис / Хост", value="Cloudflare / Google AI Studio")
             v_note = st.text_area("Публичная заметка (без секрета)")
             
-            v_submit = st.form_submit_button("🔐 Зашифровать и Сохранить")
+            v_submit = st.form_submit_button("🔐 Зашифровать и Сохранить", disabled=not bridge.is_active)
             
             if v_submit and v_title and v_secret:
                 encrypted_payload = encrypt_secret(v_secret, master_pass)
@@ -1745,10 +1777,11 @@ elif active_tab == "🔐 Сейф Ключей":
                     "serviceName": v_service,
                     "note": v_note
                 }
-                if bridge.is_active:
-                    bridge.save_vault_entry(vault_data)
-                st.success("🔒 Секрет успешно зашифрован по стандарту AES-256 и сохранен!")
-                st.rerun()
+                if bridge.save_vault_entry(vault_data):
+                    st.success("🔒 Секрет зашифрован и сохранён.")
+                    st.rerun()
+                else:
+                    st.error("🔴 Не удалось сохранить секрет в облачное хранилище.")
 
     st.markdown("---")
     st.markdown("### 🔑 Хранимые Секреты")
@@ -1772,9 +1805,11 @@ elif active_tab == "🔐 Сейф Ключей":
                 else:
                     st.code("••••••••••••••••••••••••••••••••••••••••••••••••")
             with col_v2:
-                if st.button("🗑️ Удалить", key=f"del_v_{ve.get('id')}"):
-                    bridge.delete_vault_entry(ve.get("id"))
-                    st.rerun()
+                if st.button("🗑️ Удалить", key=f"del_v_{ve.get('id')}", disabled=not bridge.is_active):
+                    if bridge.delete_vault_entry(ve.get("id")):
+                        st.rerun()
+                    else:
+                        st.error("🔴 Не удалось удалить запись Сейфа.")
             st.markdown("</div>", unsafe_allow_html=True)
     else:
         st.info("В Сейфе пока нет записей.")
@@ -1782,6 +1817,14 @@ elif active_tab == "🔐 Сейф Ключей":
 # ==================== РАЗДЕЛ 6: НАСТРОЙКИ ====================
 elif active_tab == "🏛️ Настройки":
     st.markdown("<h2 class='citadel-header'>🏛️ Настройки Ордена Цитадели</h2>", unsafe_allow_html=True)
-    st.markdown(f"**Текущий секретный ключ авторизации**: `{os.getenv('PIM_SECRET_KEY', 'Установлен в сессии')}`")
-    st.markdown(f"**Валидный Google Gemini API Key**: `...{os.getenv('GEMINI_API_KEY', '')[-6:]}`")
-    st.markdown("✅ Система полностью защищена и готова к публикации в интернете.")
+    st.markdown("🔐 Секреты авторизации и API-ключи не отображаются в интерфейсе.")
+    if bridge.is_active:
+        st.success("Защищённое облачное хранилище настроено.")
+    else:
+        st.error("Облачное хранилище не настроено. Данные не будут сохраняться.")
+
+if bridge.last_error:
+    st.error(
+        "🔴 Не удалось получить данные из облачного хранилища. "
+        "Записи не удалены; проверьте секрет шлюза и подключение."
+    )

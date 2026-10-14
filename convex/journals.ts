@@ -1,14 +1,17 @@
-import { mutation, query } from "./_generated/server";
+import { internalMutation, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
 
-export const listJournals = query({
+export const listJournals = internalQuery({
+    args: {},
+    returns: v.any(),
     handler: async (ctx) => {
         return await ctx.db.query("journals").order("desc").take(200);
     },
 });
 
-export const listJournalsByNotebook = query({
+export const listJournalsByNotebook = internalQuery({
     args: { notebookId: v.string() },
+    returns: v.any(),
     handler: async (ctx, args) => {
         return await ctx.db
             .query("journals")
@@ -18,7 +21,7 @@ export const listJournalsByNotebook = query({
     },
 });
 
-export const createJournal = mutation({
+export const createJournal = internalMutation({
     args: {
         id: v.string(),
         notebookId: v.optional(v.string()),
@@ -31,6 +34,7 @@ export const createJournal = mutation({
         reflectionQuestions: v.optional(v.string()),
         aiSynthesis: v.optional(v.string()),
     },
+    returns: v.any(),
     handler: async (ctx, args) => {
         const now = Date.now();
         return await ctx.db.insert("journals", {
@@ -50,7 +54,7 @@ export const createJournal = mutation({
     },
 });
 
-export const updateJournal = mutation({
+export const updateJournal = internalMutation({
     args: {
         id: v.string(),
         notebookId: v.optional(v.string()),
@@ -63,6 +67,7 @@ export const updateJournal = mutation({
         reflectionQuestions: v.optional(v.string()),
         aiSynthesis: v.optional(v.string()),
     },
+    returns: v.any(),
     handler: async (ctx, args) => {
         const existing = await ctx.db
             .query("journals")
@@ -87,8 +92,9 @@ export const updateJournal = mutation({
     },
 });
 
-export const deleteJournal = mutation({
+export const deleteJournal = internalMutation({
     args: { id: v.string() },
+    returns: v.any(),
     handler: async (ctx, args) => {
         const existing = await ctx.db
             .query("journals")

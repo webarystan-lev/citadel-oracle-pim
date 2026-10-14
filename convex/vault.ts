@@ -1,13 +1,15 @@
-import { mutation, query } from "./_generated/server";
+import { internalMutation, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
 
-export const listVaultEntries = query({
+export const listVaultEntries = internalQuery({
+    args: {},
+    returns: v.any(),
     handler: async (ctx) => {
         return await ctx.db.query("vault").order("desc").take(100);
     },
 });
 
-export const createVaultEntry = mutation({
+export const createVaultEntry = internalMutation({
     args: {
         id: v.string(),
         title: v.string(),
@@ -16,6 +18,7 @@ export const createVaultEntry = mutation({
         serviceName: v.optional(v.string()),
         note: v.optional(v.string()),
     },
+    returns: v.any(),
     handler: async (ctx, args) => {
         const now = Date.now();
         return await ctx.db.insert("vault", {
@@ -31,7 +34,7 @@ export const createVaultEntry = mutation({
     },
 });
 
-export const updateVaultEntry = mutation({
+export const updateVaultEntry = internalMutation({
     args: {
         id: v.string(),
         title: v.optional(v.string()),
@@ -40,6 +43,7 @@ export const updateVaultEntry = mutation({
         serviceName: v.optional(v.string()),
         note: v.optional(v.string()),
     },
+    returns: v.any(),
     handler: async (ctx, args) => {
         const existing = await ctx.db
             .query("vault")
@@ -60,8 +64,9 @@ export const updateVaultEntry = mutation({
     },
 });
 
-export const deleteVaultEntry = mutation({
+export const deleteVaultEntry = internalMutation({
     args: { id: v.string() },
+    returns: v.any(),
     handler: async (ctx, args) => {
         const existing = await ctx.db
             .query("vault")

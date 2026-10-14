@@ -3,10 +3,16 @@ import hashlib
 import logging
 import os
 import re
+import secrets
 from google import genai
-from cryptography.fernet import Fernet
+from cryptography.fernet import Fernet, InvalidToken
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+from cryptography.hazmat.primitives import hashes
 
 logger = logging.getLogger("PIMSecurity")
+_KDF_PREFIX = "pim2"
+_KDF_ITERATIONS = 600_000
+_KDF_SALT_BYTES = 16
 
 def sanitize_markdown(text: str) -> str:
     """
@@ -39,34 +45,57 @@ def sanitize_markdown(text: str) -> str:
 
 
 def derive_fernet_key(secret_passphrase: str) -> bytes:
-    """Генерирует 32-байтный URL-safe Base64 ключ Fernet из секретной фразы."""
-    hashed = hashlib.sha256(secret_passphrase.encode('utf-8')).digest()
-    return base64.urlsafe_b64encode(hashed)
+    """Derive a Fernet key from a passphrase using a randomly salted PBKDF2 key."""
+    salt = secrets.token_bytes(_KDF_SALT_BYTES)
+    return _derive_salted_fernet_key(secret_passphrase, salt)
+
+
+def _derive_salted_fernet_key(secret_passphrase: str, salt: bytes) -> bytes:
+    kdf = PBKDF2HMAC(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=salt,
+        iterations=_KDF_ITERATIONS,
+    )
+    return base64.urlsafe_b64encode(kdf.derive(secret_passphrase.encode("utf-8")))
+
+
+def _derive_legacy_fernet_key(secret_passphrase: str) -> bytes:
+    return base64.urlsafe_b64encode(hashlib.sha256(secret_passphrase.encode("utf-8")).digest())
 
 def encrypt_secret(plain_text: str, secret_passphrase: str) -> str:
-    """Зашифровывает данные с помощью AES-256 (Fernet) по секретному ключу."""
+    """Encrypt with Fernet using a fresh, salted PBKDF2-derived key."""
     if not plain_text or not secret_passphrase:
         return ""
     try:
-        key = derive_fernet_key(secret_passphrase)
+        salt = secrets.token_bytes(_KDF_SALT_BYTES)
+        key = _derive_salted_fernet_key(secret_passphrase, salt)
         cipher = Fernet(key)
         encrypted = cipher.encrypt(plain_text.encode('utf-8'))
-        return encrypted.decode('utf-8')
+        return "$".join((_KDF_PREFIX, base64.urlsafe_b64encode(salt).decode("ascii"), encrypted.decode("ascii")))
     except Exception as e:
-        logger.error(f"🔴 Ошибка при шифровании: {e}")
-        return ""
+        logger.error("🔴 Ошибка при шифровании: %s", type(e).__name__)
+        raise RuntimeError("Не удалось зашифровать секрет.") from e
 
 def decrypt_secret(encrypted_text: str, secret_passphrase: str) -> str:
-    """Расшифровывает данные с помощью Fernet. Возвращает расшифрованную строку или сообщение об ошибке."""
+    """Decrypt current salted records and legacy SHA-256 records."""
     if not encrypted_text or not secret_passphrase:
         return ""
     try:
-        key = derive_fernet_key(secret_passphrase)
+        if encrypted_text.startswith(f"{_KDF_PREFIX}$"):
+            _, encoded_salt, token = encrypted_text.split("$", 2)
+            salt = base64.urlsafe_b64decode(encoded_salt.encode("ascii"))
+            if len(salt) != _KDF_SALT_BYTES:
+                raise ValueError("Invalid KDF salt")
+            key = _derive_salted_fernet_key(secret_passphrase, salt)
+        else:
+            token = encrypted_text
+            key = _derive_legacy_fernet_key(secret_passphrase)
         cipher = Fernet(key)
-        decrypted = cipher.decrypt(encrypted_text.encode('utf-8'))
+        decrypted = cipher.decrypt(token.encode('ascii'))
         return decrypted.decode('utf-8')
-    except Exception as e:
-        logger.error(f"🔴 Ошибка при расшифровке (неверный ключ или поврежденные данные): {e}")
+    except (InvalidToken, ValueError, UnicodeDecodeError, UnicodeEncodeError) as e:
+        logger.warning("🔴 Ошибка при расшифровке (неверный ключ или поврежденные данные): %s", type(e).__name__)
         return "[Ошибка: Неверный ключ расшифровки]"
 
 def verify_gemini_api_key(api_key: str) -> tuple[bool, str]:

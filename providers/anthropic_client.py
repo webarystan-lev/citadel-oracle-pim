@@ -13,22 +13,22 @@ def ask_anthropic(prompt: str, model_name: str = "claude-3-5-sonnet-20240620", s
     """
     api_key = os.getenv("ANTHROPIC_API_KEY")
     if not api_key:
-        return "Ошибка: не найден ANTHROPIC_API_KEY в .env"
+        raise RuntimeError("Не настроен ANTHROPIC_API_KEY.")
 
-    client = Anthropic(api_key=api_key)
+    try:
+        client = Anthropic(api_key=api_key)
+        kwargs = {
+            "model": model_name,
+            "max_tokens": 4096,
+            "messages": [{"role": "user", "content": prompt}]
+        }
+        if system_prompt:
+            kwargs["system"] = system_prompt
 
-    kwargs = {
-        "model": model_name,
-        "max_tokens": 4096,
-        "messages": [{"role": "user", "content": prompt}]
-    }
-    if system_prompt:
-        kwargs["system"] = system_prompt
-
-    response = client.messages.create(**kwargs)
-
-    # Ответ приходит в виде списка блоков
-    return sanitize_markdown(response.content[0].text)
+        response = client.messages.create(**kwargs)
+        return sanitize_markdown(response.content[0].text)
+    except Exception as e:
+        raise RuntimeError("Ошибка генерации Anthropic; проверьте настройки API и подключение.") from e
 
 
 def stream_anthropic(messages: List[Dict[str, str]], model_name: str, temperature: float, max_tokens: int) -> Generator[str, None, None]:
@@ -37,10 +37,7 @@ def stream_anthropic(messages: List[Dict[str, str]], model_name: str, temperatur
     """
     api_key = os.getenv("ANTHROPIC_API_KEY")
     if not api_key:
-        yield "Ошибка: не найден ANTHROPIC_API_KEY в .env"
-        return
-
-    client = Anthropic(api_key=api_key)
+        raise RuntimeError("Не настроен ANTHROPIC_API_KEY.")
 
     # Извлекаем системный промпт (Anthropic ожидает его отдельным аргументом)
     system_prompt = None
@@ -64,11 +61,12 @@ def stream_anthropic(messages: List[Dict[str, str]], model_name: str, temperatur
         kwargs["system"] = system_prompt
 
     try:
+        client = Anthropic(api_key=api_key)
         with client.messages.stream(**kwargs) as stream:
             for text in stream.text_stream:
                 yield text
     except Exception as e:
-        yield f"\n[Ошибка генерации Anthropic: {str(e)}]"
+        raise RuntimeError("Ошибка потоковой генерации Anthropic; проверьте настройки API и подключение.") from e
 
 
 def list_available_anthropic_models() -> List[str]:

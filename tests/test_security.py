@@ -4,7 +4,10 @@
 """
 
 import unittest
+import base64
+import hashlib
 from unittest.mock import patch, MagicMock
+from cryptography.fernet import Fernet
 from providers.security import (
     derive_fernet_key,
     encrypt_secret,
@@ -21,20 +24,26 @@ class TestSecurityCryptography(unittest.TestCase):
         self.passphrase = "shekinah_citadel_master_passphrase_2026"
         self.secret_data = "AIzaSyTestSecretTokenCitadel_123456789!@#$%^&*()"
 
-    def test_derive_fernet_key_deterministic(self):
-        """Проверка детерминированности деривации ключа Fernet."""
+    def test_derive_fernet_key_uses_fresh_salt(self):
+        """Каждая новая деривация ключа должна использовать случайную соль."""
         key1 = derive_fernet_key(self.passphrase)
         key2 = derive_fernet_key(self.passphrase)
-        self.assertEqual(key1, key2, "Ключ из одинаковой фразы должен быть абсолютно идентичным")
+        self.assertNotEqual(key1, key2)
         self.assertIsInstance(key1, bytes)
-        # Длина Fernet Base64 ключа всегда составляет 44 символа (32 байта в base64)
         self.assertEqual(len(key1), 44)
 
-    def test_derive_fernet_key_avalanche_effect(self):
-        """Проверка лавинного эффекта при изменении хотя бы одного символа в ключе."""
-        key1 = derive_fernet_key(self.passphrase)
-        key2 = derive_fernet_key(self.passphrase + "!")
-        self.assertNotEqual(key1, key2, "Изменение пароля должно приводить к совершенно иному ключу")
+    def test_legacy_sha256_ciphertext_remains_decryptable(self):
+        """Старые записи, зашифрованные до перехода на PBKDF2, остаются доступны."""
+        legacy_key = base64.urlsafe_b64encode(hashlib.sha256(self.passphrase.encode("utf-8")).digest())
+        legacy_ciphertext = Fernet(legacy_key).encrypt(self.secret_data.encode("utf-8")).decode("ascii")
+        self.assertEqual(decrypt_secret(legacy_ciphertext, self.passphrase), self.secret_data)
+
+    def test_encryption_uses_versioned_salted_format(self):
+        first = encrypt_secret(self.secret_data, self.passphrase)
+        second = encrypt_secret(self.secret_data, self.passphrase)
+        self.assertTrue(first.startswith("pim2$"))
+        self.assertNotEqual(first, second)
+        self.assertEqual(decrypt_secret(first, self.passphrase), self.secret_data)
 
     def test_encrypt_decrypt_roundtrip(self):
         """Проверка полного цикла шифрования и расшифровки данных."""

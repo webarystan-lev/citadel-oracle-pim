@@ -13,11 +13,11 @@ citadel-oracle-pim/
 ├── .agents/                # Настройки, навыки и правила для Antigravity 2.0 & IDE
 │   ├── rules/              # Правила выполнения кода
 │   └── skills/             # Специализированные навыки агентов (convex-advisor, oracle-pim, etc.)
-├── .env                    # Секретные ключи API, CONVEX_URL, PIM_SECRET_KEY
+├── .env                    # Секретные ключи API, шлюза Convex и PIM_SECRET_KEY
 ├── .envrc                  # direnv конфигурация для автоактивации .venv
 ├── .venv/                  # Изолированное виртуальное окружение Python
 ├── app.py                  # Главное Streamlit-приложение (Gatekeeper + Авторизация + Все 6 Модулей)
-├── requirements.txt        # Версии зависимостей Python (google-genai==2.22.0, streamlit==1.58.0, convex==0.7.0)
+├── requirements.txt        # Зафиксированные версии зависимостей Python
 ├── package.json            # npm конфигурация Convex DB
 ├── convex/                 # TypeScript бэкенд Convex DB
 │   ├── schema.ts           # Расширенная схема PIM (chats, messages, notebooks, journals, projects, notes, vault)
@@ -27,10 +27,11 @@ citadel-oracle-pim/
 │   ├── journals.ts         # Обработчики дневниковых записей
 │   ├── projects.ts         # Обработчики проектов
 │   ├── notes.ts            # Обработчики заметок & базы знаний
-│   └── vault.ts            # Обработчики зашифрованного сейфа
+│   ├── vault.ts            # Обработчики зашифрованного сейфа
+│   └── http.ts             # Bearer-защищённый single-user HTTP-шлюз /pim
 └── providers/              # Провайдеры API и сервис безопасности
     ├── security.py         # Шифрование AES-256 (Fernet) и Валидация Gemini API Key
-    ├── convex_client.py    # Python ConvexBridge для синхронизации с Convex Cloud
+    ├── convex_client.py    # Python ConvexBridge через защищённый HTTP-шлюз
     ├── gemini_client.py    # Клиент Google Gemini (google-genai SDK)
     ├── anthropic_client.py # Клиент Anthropic Claude
     └── mistral_client.py   # Клиент Mistral AI
@@ -42,7 +43,8 @@ citadel-oracle-pim/
 
 Модуль `providers/security.py` отвечает за два уровня защиты:
 1. **`verify_gemini_api_key(api_key)`**: Выполняет официальный вызов `genai.list_models()` к Google Gemini API для валидации ключа при входе в систему Gatekeeper.
-2. **`encrypt_secret(plain_text, passphrase)` & `decrypt_secret(encrypted_text, passphrase)`**: Выполняет хэширование SHA-256 мастер-пароля для генерации 256-битного Fernet-ключа и зашифровывает данные Сейфа перед отправкой в Convex DB.
+2. **`encrypt_secret(plain_text, passphrase)` & `decrypt_secret(encrypted_text, passphrase)`**: Использует случайную соль и PBKDF2-HMAC-SHA256 для получения ключа Fernet. Старый формат на SHA-256 остаётся доступен для чтения, чтобы не потерять существующие записи Сейфа.
+3. **Защита Convex:** все запросы к БД проходят через HTTP endpoint `/pim` с `CONVEX_API_SECRET`; сами Convex-функции объявлены внутренними. Один и тот же токен задаётся в окружении приложения и в переменных окружения выбранного Convex deployment. Без обоих параметров облачное хранилище отключено.
 
 ---
 
@@ -73,9 +75,7 @@ npx convex dev --once   # Для среды разработки
 npx convex deploy       # Для боевой среды (Production)
 ```
 
-> **Архитектурный дуализм версий Convex**:
-> * **Python Слой (`convex==0.7.0`)**: клиентский мост (`ConvexBridge` в `providers/convex_client.py`) для вызова мутаций и запросов из Streamlit.
-> * **Node.js/TypeScript Слой (`convex ^1.42.1`)**: серверная часть в каталоге `convex/` (`schema.ts`, обработчики) и CLI-инструментарий разработчика.
+> **Безопасность доступа:** Python SDK Convex не используется. Streamlit выполняет серверный запрос к `/pim` с секретом в заголовке `Authorization`; секрет никогда не передаётся в браузер. Безопасный порядок настройки и переключения deployment приведён в [README.md](./README.md).
 
 ---
 

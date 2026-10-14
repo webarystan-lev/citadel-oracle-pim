@@ -16,8 +16,8 @@
 
 * **Язык**: Python 3.11+
 * **Фреймворк**: Streamlit 1.58.0 (темный минимализм Цитадели)
-* **СУБД**: Convex DB (`convex==0.7.0` Python + `convex` npm)
-* **Защита**: AES-256 Fernet (`cryptography==42.0.8`) + Живая валидация `GEMINI_API_KEY`
+* **СУБД**: Convex DB (`convex` npm); Python `ConvexBridge` использует защищённый Convex HTTP endpoint `/pim`
+* **Защита**: Fernet/AES-256 (`cryptography==42.0.8`), PBKDF2-HMAC-SHA256 для новых записей Сейфа, обязательная проверка `PIM_SECRET_KEY` и `GEMINI_API_KEY`, bearer-секрет серверного шлюза
 * **Окружение**: Linux, Fish-shell, `direnv`, **Antigravity 2.0 & IDE**
 
 ---
@@ -43,5 +43,7 @@
    * Запрещено выполнять push или commit без прямого запроса пользователя!
 2. **Сохранение Кодового Наследия**: При редактировании `app.py` не удаляйте комментарии и архитектурный стиль.
 3. **Безопасность**: Запрещено логировать или выводить в открытом виде зашифрованные секреты Сейфа.
+4. **Convex API**: CRUD-функции данных PIM должны оставаться `internalQuery`/`internalMutation`/`internalAction`. Единственная внешняя точка входа приложения — `convex/http.ts` с проверкой `CONVEX_API_SECRET`. Секрет хранится только в локальном `.env` и в окружении соответствующего Convex deployment; никогда не помещается в UI или Git.
+5. **Режимы Convex**: локальная настройка dev deployment не меняет production. Перед любой deployment-affecting операцией явно установите и объявите цель; production требует отдельного прямого согласия.
 
 *«Устрой пути свои пред Господом, и помыслы твои совершатся» (Притчи 16:3).*

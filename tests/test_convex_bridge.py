@@ -68,6 +68,22 @@ class TestConvexBridgeActive(unittest.TestCase):
         self.mock_client = MagicMock()
         self.bridge.client = self.mock_client
         self.bridge.is_active = True
+        query_operations = {
+            "chats:list",
+            "messages:listForChat",
+            "notebooks:listNotebooks",
+            "journals:listJournals",
+            "journals:listJournalsByNotebook",
+            "projects:listProjects",
+            "notes:listNotes",
+            "vault:listVaultEntries",
+        }
+
+        def mock_request(operation, args=None):
+            method = self.mock_client.query if operation in query_operations else self.mock_client.mutation
+            return method(operation, args) if args is not None else method(operation)
+
+        self.bridge._request = mock_request
 
     def test_check_connection_success(self):
         """Проверка успешной проверки связи."""
@@ -93,18 +109,27 @@ class TestConvexBridgeActive(unittest.TestCase):
                 "temperature": 0.7,
                 "maxTokens": 4096
             }],
-            # 2-й вызов: messages:listForChat
-            [{
-                "role": "user",
-                "content": "Мир вам!",
-                "thinking": "",
-                "meta": json.dumps({"source": "unit_test", "timestamp": 12345})
-            }, {
-                "role": "assistant",
-                "content": "И духу твоему!",
-                "thinking": "Рассуждение о благословении",
-                "meta": ""
-            }]
+            # 2-й и 3-й вызов: страницы messages:listForChat
+            {
+                "page": [{
+                    "role": "user",
+                    "content": "Мир вам!",
+                    "thinking": "",
+                    "meta": json.dumps({"source": "unit_test", "timestamp": 12345})
+                }],
+                "isDone": False,
+                "continueCursor": "next-page",
+            },
+            {
+                "page": [{
+                    "role": "assistant",
+                    "content": "И духу твоему!",
+                    "thinking": "Рассуждение о благословении",
+                    "meta": ""
+                }],
+                "isDone": True,
+                "continueCursor": None,
+            }
         ]
 
         chats = self.bridge.load_all_chats()
@@ -294,6 +319,48 @@ class TestConvexBridgeActive(unittest.TestCase):
 
         self.assertTrue(self.bridge.delete_vault_entry("v-1"))
         self.mock_client.mutation.assert_called_with("vault:deleteVaultEntry", {"id": "v-1"})
+
+
+class TestConvexBridgeHttpGateway(unittest.TestCase):
+    def test_gateway_requires_both_url_and_secret(self):
+        with patch.dict(os.environ, {}, clear=True):
+            bridge = ConvexBridge()
+
+        self.assertFalse(bridge.is_active)
+        with self.assertRaises(RuntimeError):
+            bridge._request("chats:list")
+
+    def test_gateway_url_is_derived_from_legacy_convex_cloud_url(self):
+        with patch.dict(os.environ, {
+            "CONVEX_URL": "https://sample-deployment.convex.cloud",
+        }, clear=True):
+            bridge = ConvexBridge()
+
+        self.assertEqual(
+            bridge.convex_url,
+            "https://sample-deployment.convex.site/pim",
+        )
+        self.assertFalse(bridge.is_active)
+
+    @patch("providers.convex_client.urllib.request.urlopen")
+    def test_gateway_sends_bearer_secret_and_decodes_result(self, mock_urlopen):
+        response = MagicMock()
+        response.__enter__.return_value = response
+        response.read.return_value = json.dumps({"result": [{"id": "chat-1"}]}).encode()
+        mock_urlopen.return_value = response
+
+        with patch.dict(os.environ, {
+            "CONVEX_HTTP_URL": "https://example.convex.site/pim",
+            "CONVEX_API_SECRET": "test-server-secret",
+        }, clear=True):
+            bridge = ConvexBridge()
+            result = bridge._request("chats:list")
+
+        request = mock_urlopen.call_args.args[0]
+        self.assertEqual(result, [{"id": "chat-1"}])
+        self.assertEqual(request.get_header("Authorization"), "Bearer test-server-secret")
+        self.assertEqual(json.loads(request.data), {"operation": "chats:list", "args": {}})
+        mock_urlopen.assert_called_once_with(request, timeout=20)
 
 
 if __name__ == "__main__":

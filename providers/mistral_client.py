@@ -13,21 +13,22 @@ def ask_mistral(prompt: str, model_name: str = "mistral-large-latest", system_pr
     """
     api_key = os.getenv("MISTRAL_API_KEY")
     if not api_key:
-        return "Ошибка: не найден MISTRAL_API_KEY в .env"
+        raise RuntimeError("Не настроен MISTRAL_API_KEY.")
 
-    client = Mistral(api_key=api_key)
+    try:
+        client = Mistral(api_key=api_key)
+        messages = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": prompt})
 
-    messages = []
-    if system_prompt:
-        messages.append({"role": "system", "content": system_prompt})
-    messages.append({"role": "user", "content": prompt})
-
-    response = client.chat.complete(
-        model=model_name,
-        messages=messages
-    )
-
-    return sanitize_markdown(response.choices[0].message.content)
+        response = client.chat.complete(
+            model=model_name,
+            messages=messages
+        )
+        return sanitize_markdown(response.choices[0].message.content)
+    except Exception as e:
+        raise RuntimeError("Ошибка генерации Mistral; проверьте настройки API и подключение.") from e
 
 
 def stream_mistral(messages: List[Dict[str, str]], model_name: str, temperature: float, max_tokens: int) -> Generator[str, None, None]:
@@ -36,20 +37,16 @@ def stream_mistral(messages: List[Dict[str, str]], model_name: str, temperature:
     """
     api_key = os.getenv("MISTRAL_API_KEY")
     if not api_key:
-        yield "Ошибка: не найден MISTRAL_API_KEY в .env"
-        return
-
-    client = Mistral(api_key=api_key)
-
-    api_messages = []
-    for msg in messages:
-        # Убедимся, что формат сообщений соответствует ожидаемому Mistral API
-        api_messages.append({
-            "role": msg["role"],
-            "content": msg["content"]
-        })
+        raise RuntimeError("Не настроен MISTRAL_API_KEY.")
 
     try:
+        client = Mistral(api_key=api_key)
+        api_messages = []
+        for msg in messages:
+            api_messages.append({
+                "role": msg["role"],
+                "content": msg["content"]
+            })
         response = client.chat.stream(
             model=model_name,
             messages=api_messages,
@@ -66,7 +63,7 @@ def stream_mistral(messages: List[Dict[str, str]], model_name: str, temperature:
             if delta is not None:
                 yield delta
     except Exception as e:
-        yield f"\n[Ошибка генерации Mistral: {str(e)}]"
+        raise RuntimeError("Ошибка потоковой генерации Mistral; проверьте настройки API и подключение.") from e
 
 
 def list_available_mistral_models() -> List[str]:

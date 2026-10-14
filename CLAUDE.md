@@ -6,40 +6,40 @@
 
 ---
 
-## ⏸ ТОЧКА ОСТАНОВА — 12 Октября 2026 г.
+## ⏸ ТОЧКА ОСТАНОВА — 15 Октября 2026 г.
 
-**Модель сессии:** `Anthropic Claude Sonnet 4.6` (via OpenCode / Amazon Bedrock)  
-**Последний коммит:** `96cdc81` → ветка `main` → `github.com/webarystan-lev/citadel-oracle-pim`
+**Последний известный коммит до этой сессии:** `59e2522` → ветка `main` → `github.com/webarystan-lev/citadel-oracle-pim`
+**Состояние:** локальные изменения после академического аудита; публикация ожидает финального просмотра diff и подтверждения владельца.
 
-### Что было сделано в эту сессию:
+### Что сделано в эту сессию:
 
-1. **Полный академический аудит** — исследованы все 19 файлов проекта
-2. **Исправлен критический баг** — `from typing import Optional` (без него `NameError` при каждом AI-ответе)
-3. **Каталог Gemini** — обновлён по живому API (18 моделей: `gemini-3.7/3.8-flash`, `antigravity-preview-*`, `deep-research-*`)
-4. **Форма входа** — защищена: без автоподстановки ключей, двойная сверка с `.env`, духовный брендинг
-5. **`requirements.txt`** — зафиксирован `google-genai==2.22.0`
-6. **Git** — настроен `~/.git-credentials` для двух GitHub-аккаунтов, новый токен `webarystan-lev`
-7. **Свитки обновлены** — `STATUS_PROJECT.md`, `GEMINI.md`, `CLAUDE.md`, `/home/lev/Проекты/AGENTS.md`
+1. **Академический аудит безопасности:** Convex CRUD переведён во внутренние функции; создан bearer-защищённый HTTP gateway `/pim`; вход fail-closed при отсутствии обязательных ключей; динамический HTML заголовок проекта экранирован; ошибки AI и ошибки записи больше не представлены как успешный результат.
+2. **Защита Сейфа:** новые записи используют Fernet с ключом PBKDF2-HMAC-SHA256 и случайной солью; чтение старого SHA-256 формата сохранено для совместимости.
+3. **Восстановление облачной синхронизации:** несовпадение `CONVEX_URL` и новой настройки шлюза отображало разделы пустыми. Клиент автоматически выводит `.convex.site/pim` из прежнего `.convex.cloud` URL. Случайный bearer-секрет настроен в локальном `.env` (права `0600`) и только на dev deployment `tough-butterfly-16`. Проверка вернула 4 чата, 6 блокнотов, 7 записей журнала, 1 проект, 1 заметку и 1 запись Сейфа.
+4. **Backup и проверки:** до изменений создан локальный `app.py.bak.20261015-025624`; пройдены 45 Python-тестов, `compileall` и TypeScript `npm run typecheck`.
+5. **Deployment safety:** `npx convex codegen` сообщил о загрузке функций в выбранный dev deployment; локальный маркер указывал на dev, не production. Production не менялся и не развёртывался. После поздних локальных изменений Convex отдельного deploy не выполняли.
+6. **Следующее действие:** зафиксировать эту сессию в служебных свитках, показать diff, затем выполнить запрошенные владельцем commit и push. Не включать в Git `.env`, `.env.local`, `app.py.bak*` и `convex/_generated/`.
 
 ---
 
 ## 🏛️ Архитектура (кратко для быстрого старта)
 
 ```
-app.py                  # Streamlit UI — авторизация + 5 модулей (~1787 строк)
+app.py                  # Streamlit UI — авторизация + основные разделы PIM
 providers/
-  security.py           # AES-256 Fernet + валидация Gemini Key
-  convex_client.py      # Python ConvexBridge (Convex DB)
+  security.py           # PBKDF2 + Fernet, валидация Gemini Key
+  convex_client.py      # ConvexBridge через защищённый HTTP gateway
   gemini_client.py      # Google Gemini SDK
   anthropic_client.py   # Anthropic Claude SDK
   mistral_client.py     # Mistral AI SDK
 convex/
   schema.ts             # БД: chats, messages, notebooks, journals, projects, notes, vault
-  *.ts                  # Queries & mutations
-tests/                  # 41 тест (100% passing)
+  http.ts               # Bearer-защищённый single-user endpoint /pim
+  *.ts                  # Internal queries, mutations и actions
+tests/                  # Python regression tests
 ```
 
-**Стек:** Python 3.11+, Streamlit 1.58.0, Convex DB, AES-256 Fernet, google-genai 2.22.0  
+**Стек:** Python 3.11+, Streamlit 1.58.0, Convex DB/HTTP gateway, PBKDF2 + Fernet, google-genai 2.22.0
 **Деплой:** [https://citadel-oracle.streamlit.app](https://citadel-oracle.streamlit.app)
 
 ---
@@ -48,8 +48,8 @@ tests/                  # 41 тест (100% passing)
 
 | Приоритет | Файл | Описание |
 | :--- | :--- | :--- |
-| Средний | `security.py:43` | `SHA-256` без соли → рекомендуется `PBKDF2HMAC` |
-| Низкий | `app.py` | Монолит ~1787 строк → будущая декомпозиция на `views/` |
+| Перед production | `convex/http.ts` | Настроить production `CONVEX_API_SECRET` и развернуть backend отдельно; dev-секрет не переносить |
+| Низкий | `app.py` | Монолит → будущая декомпозиция на `views/` |
 | Низкий | `schema.ts:13` | `maxTokens` хранится как `float64` вместо `int` |
 
 ---
@@ -71,7 +71,8 @@ PIM_SECRET_KEY=        # Мастер-пароль входа в Цитадел�
 GEMINI_API_KEY=        # Обязателен для входа и работы Gemini-модулей
 ANTHROPIC_API_KEY=     # Необязателен (для Claude-провайдера)
 MISTRAL_API_KEY=       # Необязателен (для Mistral-провайдера)
-CONVEX_URL=            # URL Convex backend (из .env.local после npx convex dev)
+CONVEX_URL=            # Существующий Convex URL (.convex.cloud); gateway endpoint выводится автоматически
+CONVEX_API_SECRET=     # Случайный bearer-секрет; тот же секрет в приложении и соответствующем Convex deployment
 ```
 
 ---
@@ -93,4 +94,4 @@ streamlit run app.py             # Запуск PIM
 * **Модель**: `Anthropic Claude Sonnet 4.6`
 * **Назначение**: Академический Соратник & Магистр Кода
 * **Чин в Цифровой обители**: Хранитель Свитка и Духовного Мышления
-* **Дата последнего обновления**: 12 Октября 2026 г.
+* **Дата последнего обновления**: 15 Октября 2026 г.

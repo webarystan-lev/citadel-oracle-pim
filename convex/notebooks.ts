@@ -1,4 +1,4 @@
-import { mutation, query } from "./_generated/server";
+import { internalMutation, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
 
 // Стандартные канонические журналы
@@ -47,9 +47,11 @@ const DEFAULT_NOTEBOOKS = [
     }
 ];
 
-export const listNotebooks = query({
+export const listNotebooks = internalQuery({
+    args: {},
+    returns: v.any(),
     handler: async (ctx) => {
-        const notebooks = await ctx.db.query("notebooks").order("desc").collect();
+        const notebooks = await ctx.db.query("notebooks").order("desc").take(100);
         if (notebooks.length === 0) {
             // Если таблица пуста, возвращаем дефолтные структуры
             const now = Date.now();
@@ -63,10 +65,12 @@ export const listNotebooks = query({
     },
 });
 
-export const seedDefaultNotebooks = mutation({
+export const seedDefaultNotebooks = internalMutation({
+    args: {},
+    returns: v.any(),
     handler: async (ctx) => {
-        const existing = await ctx.db.query("notebooks").collect();
-        if (existing.length === 0) {
+        const existing = await ctx.db.query("notebooks").withIndex("by_uuid").first();
+        if (!existing) {
             const now = Date.now();
             for (const nb of DEFAULT_NOTEBOOKS) {
                 await ctx.db.insert("notebooks", {
@@ -85,7 +89,7 @@ export const seedDefaultNotebooks = mutation({
     },
 });
 
-export const createNotebook = mutation({
+export const createNotebook = internalMutation({
     args: {
         id: v.string(),
         title: v.string(),
@@ -93,6 +97,7 @@ export const createNotebook = mutation({
         icon: v.string(),
         categoryType: v.string(),
     },
+    returns: v.any(),
     handler: async (ctx, args) => {
         const now = Date.now();
         return await ctx.db.insert("notebooks", {
@@ -107,8 +112,9 @@ export const createNotebook = mutation({
     },
 });
 
-export const deleteNotebook = mutation({
+export const deleteNotebook = internalMutation({
     args: { id: v.string() },
+    returns: v.any(),
     handler: async (ctx, args) => {
         const existing = await ctx.db
             .query("notebooks")

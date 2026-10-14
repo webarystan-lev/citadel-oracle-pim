@@ -1,6 +1,9 @@
 import os
 import json
 import logging
+import urllib.error
+import urllib.request
+from urllib.parse import urlsplit, urlunsplit
 from typing import Dict, List, Any, Optional
 from dotenv import load_dotenv
 
@@ -15,47 +18,77 @@ class ConvexBridge:
     Обеспечивает реактивную синхронизацию диалогов, журнала, проектов, заметок и зашифрованного сейфа.
     """
     def __init__(self):
-        self.convex_url = os.getenv("CONVEX_URL")
+        self.convex_url = self._get_http_url()
+        self.api_secret = os.getenv("CONVEX_API_SECRET")
         self.client = None
         self.is_active = False
+        self.last_error = None
 
-        if not self.convex_url:
-            logger.warning("⚠️ Переменная CONVEX_URL не обнаружена в окружении. Мост Convex переведен в автономный (In-Memory) режим.")
+        if not self.convex_url or not self.api_secret:
+            logger.warning("⚠️ CONVEX_HTTP_URL или CONVEX_API_SECRET не настроены. Облачное хранилище отключено.")
             return
 
+        self.client = object()
+        self.is_active = True
+        logger.info("✨ Защищённый шлюз Convex настроен.")
+
+    @staticmethod
+    def _get_http_url() -> Optional[str]:
+        configured_url = os.getenv("CONVEX_HTTP_URL")
+        if configured_url:
+            parts = urlsplit(configured_url.strip())
+            path = parts.path.rstrip("/")
+            if not path.endswith("/pim"):
+                path = f"{path}/pim"
+            return urlunsplit((parts.scheme, parts.netloc, path, "", ""))
+
+        convex_url = os.getenv("CONVEX_URL")
+        if not convex_url:
+            return None
+
+        parts = urlsplit(convex_url.strip())
+        hostname = parts.hostname or ""
+        if parts.scheme != "https" or not hostname.endswith(".convex.cloud"):
+            return None
+        gateway_host = hostname.removesuffix(".convex.cloud") + ".convex.site"
+        return urlunsplit(("https", gateway_host, "/pim", "", ""))
+
+    def _request(self, operation: str, args: Optional[Dict[str, Any]] = None) -> Any:
+        if not self.is_active or not self.convex_url or not self.api_secret:
+            raise RuntimeError("Защищённый шлюз Convex не настроен.")
+
+        request = urllib.request.Request(
+            self.convex_url,
+            data=json.dumps({"operation": operation, "args": args or {}}).encode("utf-8"),
+            headers={
+                "Authorization": f"Bearer {self.api_secret}",
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
         try:
-            import sys
-            orig_path = list(sys.path)
-            
-            # Временно удаляем локальные пути и пути корня проекта, чтобы импортировался настоящий пакет convex, а не папка convex/
-            sys.path = [
-                p for p in sys.path 
-                if os.path.abspath(p) not in (
-                    os.path.abspath('.'), 
-                    os.path.abspath(os.getcwd()), 
-                    os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
-                )
-            ]
-            
-            from convex import ConvexClient
-            
-            sys.path = orig_path
-            
-            self.client = ConvexClient(self.convex_url)
-            self.is_active = True
-            logger.info(f"✨ Мост Convex успешно инициализирован. Подключение к обители: {self.convex_url}")
-        except Exception as e:
-            if 'orig_path' in locals():
-                sys.path = orig_path
-            logger.error(f"🔴 Ошибка при инициализации ConvexClient: {str(e)}")
-            self.is_active = False
+            with urllib.request.urlopen(request, timeout=20) as response:
+                payload = json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as e:
+            self.last_error = f"HTTP {e.code}"
+            raise RuntimeError(f"Convex HTTP gateway returned status {e.code}.") from e
+        except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as e:
+            self.last_error = type(e).__name__
+            raise RuntimeError("Unable to reach the Convex HTTP gateway.") from e
+
+        if not isinstance(payload, dict) or "result" not in payload:
+            reason = payload.get("error", "Invalid gateway response") if isinstance(payload, dict) else "Invalid gateway response"
+            self.last_error = str(reason)
+            raise RuntimeError(reason)
+        self.last_error = None
+        return payload["result"]
 
     def check_connection(self) -> bool:
         """Проверяет работоспособность подключения."""
         if not self.is_active or not self.client:
             return False
         try:
-            self.client.query("chats:list")
+            self._request("chats:list")
             return True
         except Exception as e:
             logger.warning(f"⚠️ Сетевой сбой при проверке связи с Convex DB: {str(e)}")
@@ -67,12 +100,29 @@ class ConvexBridge:
             return {}
 
         try:
-            db_chats = self.client.query("chats:list")
+            db_chats = self._request("chats:list")
             chats_dict = {}
 
             for chat in db_chats:
                 chat_id = chat["id"]
-                db_messages = self.client.query("messages:listForChat", {"chatId": chat_id})
+                db_messages = []
+                cursor = None
+                while True:
+                    message_args = {"chatId": chat_id}
+                    if cursor is not None:
+                        message_args["paginationOpts"] = {"numItems": 100, "cursor": cursor}
+                    response = self._request("messages:listForChat", message_args)
+                    if isinstance(response, list):
+                        db_messages.extend(response)
+                        break
+                    if not isinstance(response, dict) or not isinstance(response.get("page"), list):
+                        raise RuntimeError("Invalid paginated messages response.")
+                    db_messages.extend(response["page"])
+                    if response.get("isDone"):
+                        break
+                    cursor = response.get("continueCursor")
+                    if not cursor:
+                        raise RuntimeError("Missing cursor for next messages page.")
                 messages_list = []
                 
                 for msg in db_messages:
@@ -109,7 +159,7 @@ class ConvexBridge:
         if not self.is_active or not self.client:
             return False
         try:
-            self.client.mutation("chats:save", {
+            self._request("chats:save", {
                 "id": chat_id,
                 "title": chat_data.get("title", "🏛️ Новый диалог"),
                 "provider": chat_data.get("provider", "Google Gemini"),
@@ -127,7 +177,7 @@ class ConvexBridge:
         if not self.is_active or not self.client:
             return False
         try:
-            self.client.mutation("chats:rename", {"id": chat_id, "title": title})
+            self._request("chats:rename", {"id": chat_id, "title": title})
             return True
         except Exception as e:
             logger.error(f"🔴 Ошибка chats:rename: {str(e)}")
@@ -137,7 +187,7 @@ class ConvexBridge:
         if not self.is_active or not self.client:
             return False
         try:
-            self.client.mutation("chats:remove", {"id": chat_id})
+            self._request("chats:remove", {"id": chat_id})
             return True
         except Exception as e:
             logger.error(f"🔴 Ошибка chats:remove: {str(e)}")
@@ -148,7 +198,7 @@ class ConvexBridge:
             return False
         try:
             meta_str = json.dumps(message.get("meta", {})) if message.get("meta") else ""
-            self.client.mutation("messages:add", {
+            self._request("messages:add", {
                 "chatId": chat_id,
                 "role": message["role"],
                 "content": message["content"],
@@ -165,7 +215,7 @@ class ConvexBridge:
         if not self.is_active or not self.client:
             return []
         try:
-            return self.client.query("notebooks:listNotebooks")
+            return self._request("notebooks:listNotebooks")
         except Exception as e:
             logger.error(f"🔴 Ошибка notebooks:listNotebooks: {str(e)}")
             return []
@@ -174,7 +224,7 @@ class ConvexBridge:
         if not self.is_active or not self.client:
             return False
         try:
-            self.client.mutation("notebooks:createNotebook", {
+            self._request("notebooks:createNotebook", {
                 "id": notebook_data["id"],
                 "title": notebook_data["title"],
                 "description": notebook_data.get("description", ""),
@@ -190,7 +240,7 @@ class ConvexBridge:
         if not self.is_active or not self.client:
             return False
         try:
-            self.client.mutation("notebooks:deleteNotebook", {"id": notebook_id})
+            self._request("notebooks:deleteNotebook", {"id": notebook_id})
             return True
         except Exception as e:
             logger.error(f"🔴 Ошибка notebooks:deleteNotebook: {str(e)}")
@@ -201,7 +251,7 @@ class ConvexBridge:
         if not self.is_active or not self.client:
             return []
         try:
-            return self.client.query("journals:listJournals")
+            return self._request("journals:listJournals")
         except Exception as e:
             logger.error(f"🔴 Ошибка journals:listJournals: {str(e)}")
             return []
@@ -210,7 +260,7 @@ class ConvexBridge:
         if not self.is_active or not self.client:
             return []
         try:
-            return self.client.query("journals:listJournalsByNotebook", {"notebookId": notebook_id})
+            return self._request("journals:listJournalsByNotebook", {"notebookId": notebook_id})
         except Exception as e:
             logger.error(f"🔴 Ошибка journals:listJournalsByNotebook: {str(e)}")
             # Фолбэк на фильтрацию по клиентской стороне
@@ -235,7 +285,7 @@ class ConvexBridge:
             if journal_data.get("notebookId"):
                 payload["notebookId"] = journal_data["notebookId"]
 
-            self.client.mutation("journals:createJournal", payload)
+            self._request("journals:createJournal", payload)
             return True
         except Exception as e:
             logger.error(f"🔴 Ошибка journals:createJournal: {str(e)}")
@@ -256,7 +306,7 @@ class ConvexBridge:
             if "reflectionQuestions" in journal_data: payload["reflectionQuestions"] = journal_data["reflectionQuestions"]
             if "aiSynthesis" in journal_data: payload["aiSynthesis"] = journal_data["aiSynthesis"]
 
-            self.client.mutation("journals:updateJournal", payload)
+            self._request("journals:updateJournal", payload)
             return True
         except Exception as e:
             logger.error(f"🔴 Ошибка journals:updateJournal: {str(e)}")
@@ -266,7 +316,7 @@ class ConvexBridge:
         if not self.is_active or not self.client:
             return False
         try:
-            self.client.mutation("journals:deleteJournal", {"id": entry_id})
+            self._request("journals:deleteJournal", {"id": entry_id})
             return True
         except Exception as e:
             logger.error(f"🔴 Ошибка journals:deleteJournal: {str(e)}")
@@ -277,7 +327,7 @@ class ConvexBridge:
         if not self.is_active or not self.client:
             return []
         try:
-            return self.client.query("projects:listProjects")
+            return self._request("projects:listProjects")
         except Exception as e:
             logger.error(f"🔴 Ошибка projects:listProjects: {str(e)}")
             return []
@@ -286,7 +336,7 @@ class ConvexBridge:
         if not self.is_active or not self.client:
             return False
         try:
-            self.client.mutation("projects:createProject", {
+            self._request("projects:createProject", {
                 "id": project_data["id"],
                 "title": project_data["title"],
                 "description": project_data["description"],
@@ -304,7 +354,7 @@ class ConvexBridge:
         if not self.is_active or not self.client:
             return False
         try:
-            self.client.mutation("projects:deleteProject", {"id": project_id})
+            self._request("projects:deleteProject", {"id": project_id})
             return True
         except Exception as e:
             logger.error(f"🔴 Ошибка projects:deleteProject: {str(e)}")
@@ -315,7 +365,7 @@ class ConvexBridge:
         if not self.is_active or not self.client:
             return []
         try:
-            return self.client.query("notes:listNotes")
+            return self._request("notes:listNotes")
         except Exception as e:
             logger.error(f"🔴 Ошибка notes:listNotes: {str(e)}")
             return []
@@ -324,7 +374,7 @@ class ConvexBridge:
         if not self.is_active or not self.client:
             return False
         try:
-            self.client.mutation("notes:createNote", {
+            self._request("notes:createNote", {
                 "id": note_data["id"],
                 "title": note_data["title"],
                 "category": note_data.get("category", "General"),
@@ -341,7 +391,7 @@ class ConvexBridge:
         if not self.is_active or not self.client:
             return False
         try:
-            self.client.mutation("notes:deleteNote", {"id": note_id})
+            self._request("notes:deleteNote", {"id": note_id})
             return True
         except Exception as e:
             logger.error(f"🔴 Ошибка notes:deleteNote: {str(e)}")
@@ -352,7 +402,7 @@ class ConvexBridge:
         if not self.is_active or not self.client:
             return []
         try:
-            return self.client.query("vault:listVaultEntries")
+            return self._request("vault:listVaultEntries")
         except Exception as e:
             logger.error(f"🔴 Ошибка vault:listVaultEntries: {str(e)}")
             return []
@@ -361,7 +411,7 @@ class ConvexBridge:
         if not self.is_active or not self.client:
             return False
         try:
-            self.client.mutation("vault:createVaultEntry", {
+            self._request("vault:createVaultEntry", {
                 "id": vault_data["id"],
                 "title": vault_data["title"],
                 "secretType": vault_data.get("secretType", "API_KEY"),
@@ -378,7 +428,7 @@ class ConvexBridge:
         if not self.is_active or not self.client:
             return False
         try:
-            self.client.mutation("vault:deleteVaultEntry", {"id": entry_id})
+            self._request("vault:deleteVaultEntry", {"id": entry_id})
             return True
         except Exception as e:
             logger.error(f"🔴 Ошибка vault:deleteVaultEntry: {str(e)}")

@@ -1,13 +1,16 @@
-import { mutation, query } from "./_generated/server";
+import { internalAction, internalMutation, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
+import { internal } from "./_generated/api";
 
-export const list = query({
+export const list = internalQuery({
+    args: {},
+    returns: v.any(),
     handler: async (ctx) => {
         return await ctx.db.query("chats").order("desc").take(100);
     },
 });
 
-export const save = mutation({
+export const save = internalMutation({
     args: {
         id: v.string(),
         title: v.string(),
@@ -17,6 +20,7 @@ export const save = mutation({
         temperature: v.float64(),
         maxTokens: v.float64(),
     },
+    returns: v.any(),
     handler: async (ctx, args) => {
         const existing = await ctx.db
             .query("chats")
@@ -49,11 +53,12 @@ export const save = mutation({
     },
 });
 
-export const rename = mutation({
+export const rename = internalMutation({
     args: {
         id: v.string(),
         title: v.string(),
     },
+    returns: v.any(),
     handler: async (ctx, args) => {
         const existing = await ctx.db
             .query("chats")
@@ -68,25 +73,41 @@ export const rename = mutation({
     },
 });
 
-export const remove = mutation({
+export const removeBatch = internalMutation({
     args: { id: v.string() },
+    returns: v.any(),
     handler: async (ctx, args) => {
         const existing = await ctx.db
             .query("chats")
             .withIndex("by_uuid", (q) => q.eq("id", args.id))
             .first();
 
-        if (existing) {
-            const messages = await ctx.db
-                .query("messages")
-                .withIndex("by_chatId", (q) => q.eq("chatId", args.id))
-                .collect();
-            for (const msg of messages) {
-                await ctx.db.delete(msg._id);
-            }
-            await ctx.db.delete(existing._id);
-            return true;
+        const messages = await ctx.db
+            .query("messages")
+            .withIndex("by_chatId", (q) => q.eq("chatId", args.id))
+            .order("asc")
+            .take(500);
+        for (const msg of messages) {
+            await ctx.db.delete(msg._id);
         }
-        return false;
+        if (messages.length < 500) {
+            if (existing) {
+                await ctx.db.delete(existing._id);
+            }
+            return false;
+        }
+        return true;
+    },
+});
+
+export const remove = internalAction({
+    args: { id: v.string() },
+    returns: v.boolean(),
+    handler: async (ctx, args) => {
+        let hasMore = true;
+        while (hasMore) {
+            hasMore = await ctx.runMutation(internal.chats.removeBatch, args);
+        }
+        return true;
     },
 });

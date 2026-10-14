@@ -1,13 +1,15 @@
-import { mutation, query } from "./_generated/server";
+import { internalMutation, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
 
-export const listNotes = query({
+export const listNotes = internalQuery({
+    args: {},
+    returns: v.any(),
     handler: async (ctx) => {
         return await ctx.db.query("notes").order("desc").take(200);
     },
 });
 
-export const createNote = mutation({
+export const createNote = internalMutation({
     args: {
         id: v.string(),
         title: v.string(),
@@ -16,6 +18,7 @@ export const createNote = mutation({
         tags: v.array(v.string()),
         isArchived: v.boolean(),
     },
+    returns: v.any(),
     handler: async (ctx, args) => {
         const now = Date.now();
         return await ctx.db.insert("notes", {
@@ -31,7 +34,7 @@ export const createNote = mutation({
     },
 });
 
-export const updateNote = mutation({
+export const updateNote = internalMutation({
     args: {
         id: v.string(),
         title: v.optional(v.string()),
@@ -40,6 +43,7 @@ export const updateNote = mutation({
         tags: v.optional(v.array(v.string())),
         isArchived: v.optional(v.boolean()),
     },
+    returns: v.any(),
     handler: async (ctx, args) => {
         const existing = await ctx.db
             .query("notes")
@@ -60,8 +64,9 @@ export const updateNote = mutation({
     },
 });
 
-export const deleteNote = mutation({
+export const deleteNote = internalMutation({
     args: { id: v.string() },
+    returns: v.any(),
     handler: async (ctx, args) => {
         const existing = await ctx.db
             .query("notes")

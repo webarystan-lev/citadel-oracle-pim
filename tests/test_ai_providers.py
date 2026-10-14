@@ -15,9 +15,10 @@ class TestGeminiClient(unittest.TestCase):
     def test_missing_api_key(self):
         """Проверка безопасного поведения при отсутствии ключа API."""
         with patch.dict(os.environ, {}, clear=True):
-            self.assertIn("Ошибка", gemini_client.ask_gemini("Привет"))
-            stream_res = list(gemini_client.stream_gemini([{"role": "user", "content": "Привет"}]))
-            self.assertTrue(any("Ошибка" in chunk for chunk in stream_res))
+            with self.assertRaises(RuntimeError):
+                gemini_client.ask_gemini("Привет")
+            with self.assertRaises(RuntimeError):
+                list(gemini_client.stream_gemini([{"role": "user", "content": "Привет"}]))
             self.assertEqual(gemini_client.list_available_gemini_models(), [])
 
     @patch("providers.gemini_client.genai.Client")
@@ -76,9 +77,10 @@ class TestAnthropicClient(unittest.TestCase):
     def test_missing_api_key(self):
         """Проверка поведения Anthropic при отсутствии ключа."""
         with patch.dict(os.environ, {}, clear=True):
-            self.assertIn("Ошибка", anthropic_client.ask_anthropic("Вопрос"))
-            stream_res = list(anthropic_client.stream_anthropic([], "claude-3-5-sonnet", 0.7, 1000))
-            self.assertTrue(any("Ошибка" in chunk for chunk in stream_res))
+            with self.assertRaises(RuntimeError):
+                anthropic_client.ask_anthropic("Вопрос")
+            with self.assertRaises(RuntimeError):
+                list(anthropic_client.stream_anthropic([], "claude-3-5-sonnet", 0.7, 1000))
             self.assertEqual(anthropic_client.list_available_anthropic_models(), [])
 
     @patch("providers.anthropic_client.Anthropic")
@@ -118,9 +120,10 @@ class TestMistralClient(unittest.TestCase):
     def test_missing_api_key(self):
         """Проверка поведения Mistral при отсутствии ключа."""
         with patch.dict(os.environ, {}, clear=True):
-            self.assertIn("Ошибка", mistral_client.ask_mistral("Привет"))
-            stream_res = list(mistral_client.stream_mistral([], "mistral-large-latest", 0.7, 1000))
-            self.assertTrue(any("Ошибка" in chunk for chunk in stream_res))
+            with self.assertRaises(RuntimeError):
+                mistral_client.ask_mistral("Привет")
+            with self.assertRaises(RuntimeError):
+                list(mistral_client.stream_mistral([], "mistral-large-latest", 0.7, 1000))
             self.assertEqual(mistral_client.list_available_mistral_models(), [])
 
     @patch("providers.mistral_client.Mistral")

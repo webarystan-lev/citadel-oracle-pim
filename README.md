@@ -80,7 +80,6 @@ cd citadel-oracle-pim
    * `mistralai==2.5.2`
    * `python-dotenv==1.2.2`
    * `pyperclip==1.9.0`
-   * `convex==0.7.0` (клиентский Python SDK)
    * `cryptography==42.0.8`
 
 ---
@@ -89,9 +88,7 @@ cd citadel-oracle-pim
 
 Система использует **Convex DB** для синхронизации всех данных (чаты, журналы, блокноты, проекты, заметки, сейф).
 
-> **Примечание об архитектурном дуализме версий Convex:**
-> * **Python Слой (`convex==0.7.0`)**: официальный клиентский мост (`ConvexBridge` в `providers/convex_client.py`) для выполнения запросов и мутаций из среды Python/Streamlit.
-> * **Node.js/TypeScript Слой (`convex: ^1.42.1` в `package.json`)**: серверная схема данных, обработчики в каталоге `convex/` и CLI-инструментарий развертывания.
+> **Архитектура доступа:** Streamlit вызывает защищённый HTTP endpoint Convex с серверным bearer-токеном. Convex-функции доступны приложению только как внутренние; Python SDK Convex не используется.
 
 1. **Установите Node-зависимости**:
    ```bash
@@ -104,7 +101,7 @@ cd citadel-oracle-pim
    ```
    * Команда предложит войти через браузер в аккаунт Convex.
    * Будет создан проект в вашем аккаунте Convex и сформирован файл `.env.local` с переменными `CONVEX_URL` и `CONVEX_DEPLOYMENT`.
-   * Автоматически развернется схема из директории `convex/` (`schema.ts`, `chats.ts`, `journals.ts`, `projects.ts`, `notes.ts`, `vault.ts`).
+   * Автоматически развернутся внутренние функции из `convex/` и HTTP endpoint `/pim`.
 
 3. **Развертывание схемы в Production (при необходимости)**:
    ```bash
@@ -128,9 +125,17 @@ GEMINI_API_KEY=AIzaSy...ваш_ключ_gemini
 ANTHROPIC_API_KEY=sk-ant-...ваш_ключ_anthropic
 MISTRAL_API_KEY=...ваш_ключ_mistral
 
-# 🌐 URL Вашей бэкенд-базы данных Convex DB (скопируйте из .env.local или панели Convex)
-CONVEX_URL=https://ваша-бд.convex.cloud
+# 🌐 Защищённый HTTP endpoint вашего Convex deployment
+# Необязательно, если задан CONVEX_URL; адрес /pim будет выведен автоматически
+CONVEX_HTTP_URL=https://ваш-деплой.convex.site/pim
+
+# 🔐 Случайный секретный токен; тот же секрет задайте в Convex Dashboard → Settings → Environment Variables
+CONVEX_API_SECRET=случайная_строка_не_менее_32_байт
 ```
+
+Все Convex-функции чтения и записи доступны приложению только через HTTP-шлюз `/pim`; прямые клиентские функции переведены во внутренние. `CONVEX_API_SECRET` должен быть задан как в среде Streamlit, так и в переменных окружения Convex deployment. Не добавляйте его в Git и не передавайте в браузер. Прежний `CONVEX_URL` с доменом `.convex.cloud` автоматически преобразуется в endpoint `.convex.site/pim`; явный `CONVEX_HTTP_URL` необязателен. Пока секрет не настроен с обеих сторон, приложение сообщает о недоступности данных и отключает операции записи.
+
+Перед переключением используемого deployment сначала задайте `CONVEX_API_SECRET` в его настройках и `CONVEX_HTTP_URL`/тот же `CONVEX_API_SECRET` в среде приложения, затем разверните новые Convex-функции. Старые открытые публичные функции исчезнут из API после успешного обновления deployment.
 
 ---
 
@@ -165,7 +170,7 @@ streamlit run app.py
 
 ```
 citadel-oracle-pim/
-├── .env                    # Секретные ключи PIM_SECRET_KEY, GEMINI_API_KEY, CONVEX_URL
+├── .env                    # Секретные ключи PIM, AI-провайдеров и защищённого Convex-шлюза
 ├── app.py                  # Главный интерфейс PIM (Streamlit + Авторизация + 5 Модулей)
 ├── requirements.txt        # Зависимости Python
 ├── package.json            # Node.js манифест Convex DB

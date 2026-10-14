@@ -1,13 +1,15 @@
-import { mutation, query } from "./_generated/server";
+import { internalMutation, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
 
-export const listProjects = query({
+export const listProjects = internalQuery({
+    args: {},
+    returns: v.any(),
     handler: async (ctx) => {
         return await ctx.db.query("projects").order("desc").take(100);
     },
 });
 
-export const createProject = mutation({
+export const createProject = internalMutation({
     args: {
         id: v.string(),
         title: v.string(),
@@ -17,6 +19,7 @@ export const createProject = mutation({
         milestones: v.optional(v.string()),
         tags: v.array(v.string()),
     },
+    returns: v.any(),
     handler: async (ctx, args) => {
         const now = Date.now();
         return await ctx.db.insert("projects", {
@@ -33,7 +36,7 @@ export const createProject = mutation({
     },
 });
 
-export const updateProject = mutation({
+export const updateProject = internalMutation({
     args: {
         id: v.string(),
         title: v.optional(v.string()),
@@ -43,6 +46,7 @@ export const updateProject = mutation({
         milestones: v.optional(v.string()),
         tags: v.optional(v.array(v.string())),
     },
+    returns: v.any(),
     handler: async (ctx, args) => {
         const existing = await ctx.db
             .query("projects")
@@ -64,8 +68,9 @@ export const updateProject = mutation({
     },
 });
 
-export const deleteProject = mutation({
+export const deleteProject = internalMutation({
     args: { id: v.string() },
+    returns: v.any(),
     handler: async (ctx, args) => {
         const existing = await ctx.db
             .query("projects")
