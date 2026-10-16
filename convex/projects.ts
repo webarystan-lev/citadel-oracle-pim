@@ -18,6 +18,8 @@ export const createProject = internalMutation({
         category: v.string(),
         milestones: v.optional(v.string()),
         tags: v.array(v.string()),
+        startDate: v.optional(v.string()),
+        endDate: v.optional(v.string()),
     },
     returns: v.any(),
     handler: async (ctx, args) => {
@@ -30,6 +32,8 @@ export const createProject = internalMutation({
             category: args.category,
             milestones: args.milestones,
             tags: args.tags,
+            startDate: args.startDate,
+            endDate: args.endDate,
             createdAt: now,
             updatedAt: now,
         });
@@ -45,6 +49,8 @@ export const updateProject = internalMutation({
         category: v.optional(v.string()),
         milestones: v.optional(v.string()),
         tags: v.optional(v.array(v.string())),
+        startDate: v.optional(v.string()),
+        endDate: v.optional(v.string()),
     },
     returns: v.any(),
     handler: async (ctx, args) => {
@@ -62,6 +68,8 @@ export const updateProject = internalMutation({
         if (args.category !== undefined) updateData.category = args.category;
         if (args.milestones !== undefined) updateData.milestones = args.milestones;
         if (args.tags !== undefined) updateData.tags = args.tags;
+        if (args.startDate !== undefined) updateData.startDate = args.startDate;
+        if (args.endDate !== undefined) updateData.endDate = args.endDate;
 
         await ctx.db.patch(existing._id, updateData);
         return existing._id;

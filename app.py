@@ -7,7 +7,9 @@ import json
 import html
 import base64
 import hmac
-from typing import Optional
+import calendar as month_calendar
+from datetime import date
+from typing import Any, Dict, List, Optional
 from dotenv import load_dotenv
 
 # Загружаем переменные окружения
@@ -20,6 +22,329 @@ import streamlit as st
 from providers import anthropic_client, gemini_client, mistral_client, convex_client
 from providers.convex_client import ConvexBridge
 from providers.security import encrypt_secret, decrypt_secret, verify_gemini_api_key, sanitize_markdown
+from providers.records import parse_record_date, record_matches_date
+
+
+def render_record_editor(
+    record_type: str,
+    record: Dict[str, Any],
+    projects: List[Dict[str, Any]],
+    notebooks: List[Dict[str, Any]],
+    key_prefix: str,
+    *,
+    creating: bool = False,
+    default_date: Optional[date] = None,
+    master_passphrase: str = "",
+) -> None:
+    """Render a full-width record editor with its Markdown preview below the fields."""
+    editor_identity = key_prefix
+    editor_version_key = f"record_editor_version_{editor_identity}"
+    key_prefix = f"{editor_identity}_{st.session_state.get(editor_version_key, 0)}"
+    project_options = {"": "📌 Без привязки к проекту"}
+    project_options.update({
+        str(project["id"]): f"📁 {project.get('title', 'Проект')}"
+        for project in projects if project.get("id")
+    })
+    notebook_options = {
+        str(notebook["id"]): f"{notebook.get('icon', '📓')} {notebook.get('title', 'Журнал')}"
+        for notebook in notebooks if notebook.get("id")
+    }
+    selected_default_date = default_date or date.today()
+
+    title = st.text_input(
+        "Название",
+        value=record.get("title", ""),
+        key=f"{key_prefix}_title",
+    )
+    project_id = ""
+    start_date_value = ""
+    end_date_value = ""
+    markdown_parts: List[str] = []
+
+    if record_type == "journal":
+        selected_notebook = st.selectbox(
+            "Тематический журнал",
+            options=list(notebook_options),
+            format_func=lambda value: notebook_options[value],
+            index=(
+                list(notebook_options).index(record.get("notebookId"))
+                if record.get("notebookId") in notebook_options
+                else 0
+            ),
+            key=f"{key_prefix}_notebook",
+            disabled=not notebook_options,
+        ) if notebook_options else ""
+        natural_date = parse_record_date(record.get("date")) or selected_default_date
+        entry_date = st.date_input("Дата записи", value=natural_date, key=f"{key_prefix}_date")
+        category = st.text_input("Категория", value=record.get("category", ""), key=f"{key_prefix}_category")
+        project_id = st.selectbox(
+            "Привязать к существующему проекту",
+            list(project_options),
+            format_func=lambda value: project_options[value],
+            index=list(project_options).index(record.get("projectId", ""))
+            if record.get("projectId", "") in project_options else 0,
+            key=f"{key_prefix}_project",
+        )
+        tags = st.text_input("Теги (через запятую)", value=", ".join(record.get("tags", [])), key=f"{key_prefix}_tags")
+        reflection_questions = st.text_area(
+            "Вопросы для рефлексии (Markdown)",
+            value=record.get("reflectionQuestions", ""),
+            height=100,
+            key=f"{key_prefix}_reflection",
+        )
+        ai_synthesis = st.text_area(
+            "ИИ-синтез (Markdown)",
+            value=record.get("aiSynthesis", ""),
+            height=120,
+            key=f"{key_prefix}_synthesis",
+        )
+        content = st.text_area(
+            "Содержимое записи (Markdown)",
+            value=record.get("content", ""),
+            height=240,
+            key=f"{key_prefix}_content",
+        )
+        markdown_parts = [part for part in (content, reflection_questions, ai_synthesis) if part.strip()]
+    elif record_type == "project":
+        category = st.selectbox(
+            "Категория",
+            ["Ministry", "Web Development", "AI System", "Personal"],
+            index=["Ministry", "Web Development", "AI System", "Personal"].index(
+                record.get("category", "Ministry")
+            ) if record.get("category", "Ministry") in ["Ministry", "Web Development", "AI System", "Personal"] else 0,
+            key=f"{key_prefix}_category",
+        )
+        status = st.selectbox(
+            "Статус",
+            ["Active", "Planning", "Completed", "Archived"],
+            index=["Active", "Planning", "Completed", "Archived"].index(
+                record.get("status", "Active")
+            ) if record.get("status", "Active") in ["Active", "Planning", "Completed", "Archived"] else 0,
+            key=f"{key_prefix}_status",
+        )
+        description = st.text_area("Описание и цели (Markdown)", value=record.get("description", ""), height=180, key=f"{key_prefix}_description")
+        milestones = st.text_area("Этапы / Milestones (Markdown)", value=record.get("milestones", ""), height=180, key=f"{key_prefix}_milestones")
+        tags = st.text_input("Теги (через запятую)", value=", ".join(record.get("tags", [])), key=f"{key_prefix}_tags")
+        markdown_parts = [part for part in (description, milestones) if part.strip()]
+    elif record_type == "note":
+        category = st.selectbox(
+            "Категория",
+            ["Theology", "Ministry", "Code", "Ideas", "General"],
+            index=["Theology", "Ministry", "Code", "Ideas", "General"].index(
+                record.get("category", "General")
+            ) if record.get("category", "General") in ["Theology", "Ministry", "Code", "Ideas", "General"] else 0,
+            key=f"{key_prefix}_category",
+        )
+        project_id = st.selectbox(
+            "Привязать к существующему проекту",
+            list(project_options),
+            format_func=lambda value: project_options[value],
+            index=list(project_options).index(record.get("projectId", ""))
+            if record.get("projectId", "") in project_options else 0,
+            key=f"{key_prefix}_project",
+        )
+        archived = st.checkbox("В архиве", value=record.get("isArchived", False), key=f"{key_prefix}_archived")
+        tags = st.text_input("Теги (через запятую)", value=", ".join(record.get("tags", [])), key=f"{key_prefix}_tags")
+        content = st.text_area("Содержимое заметки (Markdown)", value=record.get("content", ""), height=240, key=f"{key_prefix}_content")
+        markdown_parts = [content] if content.strip() else []
+    elif record_type == "task":
+        category = st.selectbox(
+            "Категория",
+            ["Разработка", "Миссия", "Семья", "Теология", "Личное"],
+            index=["Разработка", "Миссия", "Семья", "Теология", "Личное"].index(
+                record.get("category", "Личное")
+            ) if record.get("category", "Личное") in ["Разработка", "Миссия", "Семья", "Теология", "Личное"] else 0,
+            key=f"{key_prefix}_category",
+        )
+        project_id = st.selectbox(
+            "Привязать к существующему проекту",
+            list(project_options),
+            format_func=lambda value: project_options[value],
+            index=list(project_options).index(record.get("projectId", ""))
+            if record.get("projectId", "") in project_options else 0,
+            key=f"{key_prefix}_project",
+        )
+        description = st.text_area("Описание / задача (Markdown)", value=record.get("description", ""), height=200, key=f"{key_prefix}_description")
+        markdown_parts = [description] if description.strip() else []
+    elif record_type == "vault":
+        category = st.selectbox(
+            "Тип секрета",
+            ["API_KEY", "TOKEN", "SSH_KEY", "PASSWORD", "OTHER"],
+            index=["API_KEY", "TOKEN", "SSH_KEY", "PASSWORD", "OTHER"].index(
+                record.get("secretType", "API_KEY")
+            ) if record.get("secretType", "API_KEY") in ["API_KEY", "TOKEN", "SSH_KEY", "PASSWORD", "OTHER"] else 0,
+            key=f"{key_prefix}_secret_type",
+        )
+        service_name = st.text_input("Сервис / хост", value=record.get("serviceName", ""), key=f"{key_prefix}_service")
+        secret_input = st.text_input(
+            "Новое значение секрета" if not creating else "Значение секрета",
+            value="",
+            type="password",
+            placeholder="Для сохранения прежнего значения оставьте поле пустым",
+            key=f"{key_prefix}_secret",
+        )
+        note = st.text_area("Публичная заметка (Markdown, без секрета)", value=record.get("note", ""), height=140, key=f"{key_prefix}_note")
+        markdown_parts = [note] if note.strip() else []
+    else:
+        raise ValueError(f"Unsupported record type: {record_type}")
+
+    if record_type == "vault":
+        project_id = st.selectbox(
+            "Привязать к существующему проекту",
+            list(project_options),
+            format_func=lambda value: project_options[value],
+            index=list(project_options).index(record.get("projectId", ""))
+            if record.get("projectId", "") in project_options else 0,
+            key=f"{key_prefix}_project",
+        )
+
+    start_value = parse_record_date(record.get("startDate"))
+    end_value = parse_record_date(record.get("endDate"))
+    natural_start = record_type in {"note", "project", "task", "vault"} and creating and default_date is not None
+    has_start = st.checkbox(
+        "Указать дату начала",
+        value=start_value is not None or natural_start,
+        key=f"{key_prefix}_has_start",
+    )
+    start_date = st.date_input(
+        "Дата начала",
+        value=start_value or selected_default_date,
+        key=f"{key_prefix}_start",
+        disabled=not has_start,
+    )
+    has_end = st.checkbox(
+        "Указать дату окончания",
+        value=end_value is not None,
+        key=f"{key_prefix}_has_end",
+    )
+    end_date = st.date_input(
+        "Дата окончания",
+        value=end_value or selected_default_date,
+        key=f"{key_prefix}_end",
+        disabled=not has_end,
+    )
+    start_date_value = str(start_date) if has_start else ""
+    end_date_value = str(end_date) if has_end else ""
+
+    st.markdown("#### 👁️ Предпросмотр Markdown")
+    preview = "\n\n".join(markdown_parts)
+    if preview.strip():
+        with st.container(border=True):
+            st.markdown(sanitize_markdown(preview))
+    else:
+        st.info("Предпросмотр появится после ввода Markdown-содержимого.")
+
+    action_col, cancel_col = st.columns([1, 1])
+    with action_col:
+        save_label = "Создать запись" if creating else "Сохранить изменения"
+        if st.button(save_label, key=f"{key_prefix}_save", type="primary", disabled=not bridge.is_active):
+            if not title.strip():
+                st.error("Укажите название записи.")
+                return
+            if start_date_value and end_date_value and end_date_value < start_date_value:
+                st.error("Дата окончания не может быть раньше даты начала.")
+                return
+            if record_type == "vault" and not master_passphrase:
+                st.error("🔴 Мастер-пароль Сейфа недоступен в текущей сессии.")
+                return
+            record_id = record.get("id") or str(uuid.uuid4())
+            payload: Dict[str, Any] = {"id": record_id, "title": title.strip()}
+            if record_type == "journal":
+                payload.update({
+                    "notebookId": selected_notebook,
+                    "date": str(entry_date),
+                    "content": content,
+                    "category": category,
+                    "projectId": project_id,
+                    "startDate": start_date_value,
+                    "endDate": end_date_value,
+                    "tags": [tag.strip() for tag in tags.split(",") if tag.strip()],
+                    "reflectionQuestions": reflection_questions,
+                    "aiSynthesis": ai_synthesis,
+                })
+            elif record_type == "project":
+                payload.update({
+                    "category": category,
+                    "status": status,
+                    "description": description,
+                    "milestones": milestones,
+                    "tags": [tag.strip() for tag in tags.split(",") if tag.strip()],
+                    "startDate": start_date_value,
+                    "endDate": end_date_value,
+                })
+            elif record_type == "note":
+                payload.update({
+                    "category": category,
+                    "content": content,
+                    "tags": [tag.strip() for tag in tags.split(",") if tag.strip()],
+                    "isArchived": archived,
+                    "projectId": project_id,
+                    "startDate": start_date_value,
+                    "endDate": end_date_value,
+                })
+            elif record_type == "task":
+                payload.update({
+                    "description": description,
+                    "category": category,
+                    "projectId": project_id,
+                    "startDate": start_date_value,
+                    "endDate": end_date_value,
+                })
+            elif record_type == "vault":
+                payload.update({
+                    "secretType": category,
+                    "serviceName": service_name,
+                    "note": note,
+                    "projectId": project_id,
+                    "startDate": start_date_value,
+                    "endDate": end_date_value,
+                })
+                if secret_input:
+                    payload["encryptedPayload"] = encrypt_secret(secret_input, master_passphrase)
+                elif creating:
+                    st.error("Введите значение секрета.")
+                    return
+
+            if record_type == "journal":
+                saved = bridge.save_journal(payload) if creating else bridge.update_journal(payload)
+            elif record_type == "project":
+                saved = bridge.save_project(payload) if creating else bridge.update_project(payload)
+            elif record_type == "note":
+                saved = bridge.save_note(payload) if creating else bridge.update_note(payload)
+            elif record_type == "task":
+                saved = bridge.save_task(payload) if creating else bridge.update_task(payload)
+            else:
+                saved = bridge.save_vault_entry(payload) if creating else bridge.update_vault_entry(payload)
+
+            if saved:
+                if not creating:
+                    edit_state_key = {
+                        "journal": "editing_journal_id",
+                        "project": "editing_project_id",
+                        "note": "editing_note_id",
+                        "task": "editing_task_id",
+                        "vault": "editing_vault_id",
+                    }[record_type]
+                    st.session_state[edit_state_key] = None
+                    st.session_state.calendar_editing_record = None
+                st.session_state[editor_version_key] = st.session_state.get(editor_version_key, 0) + 1
+                st.success("✅ Запись сохранена.")
+                st.rerun()
+            else:
+                st.error("🔴 Не удалось сохранить запись в облачное хранилище.")
+    with cancel_col:
+        if not creating and st.button("Отмена", key=f"{key_prefix}_cancel"):
+            state_key = {
+                "journal": "editing_journal_id",
+                "project": "editing_project_id",
+                "note": "editing_note_id",
+                "task": "editing_task_id",
+                "vault": "editing_vault_id",
+            }[record_type]
+            st.session_state[state_key] = None
+            st.session_state.calendar_editing_record = None
+            st.session_state[editor_version_key] = st.session_state.get(editor_version_key, 0) + 1
+            st.rerun()
 
 # Настройка страницы
 st.set_page_config(
@@ -57,6 +382,15 @@ CITADEL_CSS = """
         margin-bottom: 16px;
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
         backdrop-filter: blur(10px);
+    }
+
+    @keyframes calendar-record-glow {
+        0%, 100% { box-shadow: 0 0 0 rgba(96, 165, 250, 0); }
+        50% { box-shadow: 0 0 18px rgba(96, 165, 250, 0.45); }
+    }
+
+    .st-key-calendar-grid button[kind="primary"] {
+        animation: calendar-record-glow 2.2s ease-in-out infinite;
     }
     
     .citadel-header {
@@ -806,7 +1140,7 @@ with st.sidebar:
     
     active_tab = st.radio(
         "Разделы Цитадели:",
-        ["💬 ИИ-Чат & Оракул", "📖 Журнал", "📁 Проекты", "📝 Заметки", "🔐 Сейф Ключей", "🏛️ Настройки"],
+        ["💬 ИИ-Чат & Оракул", "📖 Журнал", "📁 Проекты", "📝 Заметки", "📋 Задачи", "📅 Календарь", "🔐 Сейф Ключей", "🏛️ Настройки"],
         index=0
     )
     
@@ -1248,7 +1582,6 @@ elif active_tab == "📖 Журнал":
     active_nb = nb_dict[st.session_state.active_notebook_id]
 
     # --- ПАНЕЛЬ ВЫБОРА И СОЗДАНИЯ ТЕМАТИЧЕСКОГО ЖУРНАЛА ---
-    st.markdown("<div class='citadel-card'>", unsafe_allow_html=True)
     col_nb_select, col_nb_add = st.columns([3, 1])
 
     with col_nb_select:
@@ -1296,7 +1629,41 @@ elif active_tab == "📖 Журнал":
                 else:
                     st.warning("Введите название журнала.")
 
-    st.markdown("</div>", unsafe_allow_html=True)
+        with st.popover("⚙️ Настроить журнал"):
+            notebook_title = st.text_input("Название журнала", value=active_nb.get("title", ""), key=f"notebook_title_{active_nb['id']}")
+            notebook_description = st.text_input("Описание", value=active_nb.get("description", ""), key=f"notebook_description_{active_nb['id']}")
+            notebook_icon = st.text_input("Иконка", value=active_nb.get("icon", "📓"), key=f"notebook_icon_{active_nb['id']}")
+            notebook_category = st.selectbox(
+                "Тематический профиль",
+                ["AI_WEBDEV", "MISSION", "SCHOOL_OF_CHRIST", "FAMILY", "THEOLOGY", "GENERAL"],
+                index=["AI_WEBDEV", "MISSION", "SCHOOL_OF_CHRIST", "FAMILY", "THEOLOGY", "GENERAL"].index(
+                    active_nb.get("categoryType", "GENERAL")
+                ) if active_nb.get("categoryType", "GENERAL") in ["AI_WEBDEV", "MISSION", "SCHOOL_OF_CHRIST", "FAMILY", "THEOLOGY", "GENERAL"] else 5,
+                key=f"notebook_category_{active_nb['id']}",
+            )
+            if st.button("💾 Сохранить журнал", key=f"save_notebook_{active_nb['id']}", disabled=not bridge.is_active):
+                if bridge.update_notebook({
+                    "id": active_nb["id"],
+                    "title": notebook_title,
+                    "description": notebook_description,
+                    "icon": notebook_icon,
+                    "categoryType": notebook_category,
+                }):
+                    st.rerun()
+                else:
+                    st.error("🔴 Не удалось обновить журнал.")
+            st.warning("Удаление журнала не удаляет его записи; они останутся доступны через календарь.")
+            confirm_delete_notebook = st.checkbox("Подтверждаю удаление журнала", key=f"confirm_delete_notebook_{active_nb['id']}")
+            if st.button(
+                "🗑️ Удалить журнал",
+                key=f"delete_notebook_{active_nb['id']}",
+                disabled=not bridge.is_active or not confirm_delete_notebook,
+            ):
+                if bridge.delete_notebook(active_nb["id"]):
+                    st.session_state.active_notebook_id = None
+                    st.rerun()
+                else:
+                    st.error("🔴 Не удалось удалить журнал.")
 
     # Загружаем проекты для привязки
     all_projects = bridge.load_projects() if bridge.is_active else []
@@ -1311,14 +1678,12 @@ elif active_tab == "📖 Журнал":
         active_journals = []
 
     # ДВЕ КОЛОНКИ ДЛЯ ТЕКУЩЕГО ЖУРНАЛА
-    col_left, col_right = st.columns([1, 1])
+    col_left, col_right = st.container(), st.container()
 
     with col_left:
-        st.markdown("<div class='citadel-card'>", unsafe_allow_html=True)
         st.markdown(f"### ✍️ Добавить запись в `{active_nb.get('icon')} {active_nb.get('title')}`")
 
-        import datetime
-        entry_date = st.date_input("Дата записи", value=datetime.date.today(), key=f"new_date_{active_nb['id']}")
+        entry_date = st.date_input("Дата записи", value=date.today(), key=f"new_date_{active_nb['id']}")
         entry_title = st.text_input("Заголовок дня/мысли", value=f"Размышление в {active_nb.get('title')}", key=f"new_title_{active_nb['id']}")
 
         selected_project_id = st.selectbox(
@@ -1328,28 +1693,35 @@ elif active_tab == "📖 Журнал":
             key=f"new_proj_{active_nb['id']}"
         )
 
+        has_start_date = st.checkbox("Указать дату начала", key=f"new_has_start_{active_nb['id']}")
+        entry_start_date = st.date_input(
+            "Дата начала", value=date.today(), key=f"new_start_{active_nb['id']}", disabled=not has_start_date
+        )
+        has_end_date = st.checkbox("Указать дату окончания", key=f"new_has_end_{active_nb['id']}")
+        entry_end_date = st.date_input(
+            "Дата окончания", value=date.today(), key=f"new_end_{active_nb['id']}", disabled=not has_end_date
+        )
         entry_tags = st.text_input("Теги (через запятую)", value=f"{active_nb.get('title').lower()}, рефлексия", key=f"new_tags_{active_nb['id']}")
 
-        tab_write, tab_preview = st.tabs(["✍️ Текст записи (Markdown)", "👁️ Предпросмотр Markdown"])
-
-        with tab_write:
-            entry_content = st.text_area(
-                "Содержимое записи",
-                height=220,
-                placeholder="Используйте форматирование Markdown:\n# Заголовок\n> Цитата или мысль\n* Пункт 1\n* Пункт 2",
-                key=f"new_content_{active_nb['id']}"
-            )
-
-        with tab_preview:
-            st.markdown("<div style='background: rgba(15, 23, 42, 0.6); padding: 15px; border-radius: 8px; border: 1px solid rgba(96, 165, 250, 0.2); min-height: 200px;'>", unsafe_allow_html=True)
-            if entry_content and entry_content.strip():
-                st.markdown(entry_content)
-            else:
-                st.info("Введите текст записи слева для предварительного просмотра.")
-            st.markdown("</div>", unsafe_allow_html=True)
+        entry_content = st.text_area(
+            "Содержимое записи (Markdown)",
+            height=220,
+            placeholder="Используйте форматирование Markdown:\n# Заголовок\n> Цитата или мысль\n* Пункт 1\n* Пункт 2",
+            key=f"new_content_{active_nb['id']}"
+        )
+        st.markdown("#### 👁️ Предпросмотр Markdown")
+        if entry_content and entry_content.strip():
+            with st.container(border=True):
+                st.markdown(sanitize_markdown(entry_content))
+        else:
+            st.info("Предпросмотр появится после ввода текста записи.")
 
         if st.button(f"💾 Сохранить в `{active_nb.get('title')}`", use_container_width=True, type="primary", disabled=not bridge.is_active):
-            if entry_content and entry_content.strip():
+            if not entry_title.strip():
+                st.warning("Укажите заголовок записи.")
+            elif has_start_date and has_end_date and entry_end_date < entry_start_date:
+                st.warning("Дата окончания не может быть раньше даты начала.")
+            elif entry_content and entry_content.strip():
                 journal_data = {
                     "id": str(uuid.uuid4()),
                     "notebookId": active_nb["id"],
@@ -1359,6 +1731,8 @@ elif active_tab == "📖 Журнал":
                     "tags": [t.strip() for t in entry_tags.split(",") if t.strip()],
                     "category": active_nb.get("title"),
                     "projectId": selected_project_id,
+                    "startDate": str(entry_start_date) if has_start_date else "",
+                    "endDate": str(entry_end_date) if has_end_date else "",
                     "reflectionQuestions": "",
                     "aiSynthesis": ""
                 }
@@ -1372,8 +1746,6 @@ elif active_tab == "📖 Журнал":
                         st.error("🔴 Ошибка сохранения в Convex DB.")
             else:
                 st.warning("Заполните текст записи перед сохранением.")
-
-        st.markdown("</div>", unsafe_allow_html=True)
 
     with col_right:
         st.markdown(f"### 📜 Архив Журнала «{active_nb.get('icon')} {active_nb.get('title')}» (`{len(active_journals)}` записей)")
@@ -1394,58 +1766,22 @@ elif active_tab == "📖 Журнал":
 
                 with st.expander(expander_label):
                     if st.session_state.get("editing_journal_id") == j_id:
-                        st.markdown("#### ✏️ Редактирование записи")
-                        edit_date_val = datetime.date.fromisoformat(j_date) if j_date else datetime.date.today()
-                        edit_date = st.date_input("Дата", value=edit_date_val, key=f"edit_date_{j_id}")
-                        edit_title = st.text_input("Заголовок", value=j_title, key=f"edit_title_{j_id}")
-
-                        edit_proj_id = st.selectbox(
-                            "Привязать к проекту",
-                            options=list(project_options.keys()),
-                            index=list(project_options.keys()).index(j_proj_id) if j_proj_id in project_options else 0,
-                            format_func=lambda x: project_options[x],
-                            key=f"edit_proj_{j_id}"
+                        render_record_editor(
+                            "journal",
+                            j,
+                            all_projects,
+                            notebooks,
+                            f"edit_journal_{j_id}",
                         )
-
-                        edit_tags = st.text_input("Теги", value=", ".join(j.get("tags", [])), key=f"edit_tags_{j_id}")
-
-                        tab_edit_text, tab_edit_prev = st.tabs(["✍️ Редактор Markdown", "👁️ Предпросмотр"])
-                        with tab_edit_text:
-                            edit_content = st.text_area("Текст записи", value=j.get("content", ""), height=200, key=f"edit_content_{j_id}")
-                        with tab_edit_prev:
-                            st.markdown("<div style='background: rgba(15, 23, 42, 0.6); padding: 15px; border-radius: 8px;'>", unsafe_allow_html=True)
-                            st.markdown(edit_content if edit_content else "*Пусто*")
-                            st.markdown("</div>", unsafe_allow_html=True)
-
-                        col_esave, col_ecancel = st.columns(2)
-                        with col_esave:
-                            if st.button("💾 Сохранить", key=f"save_edit_{j_id}", type="primary", use_container_width=True, disabled=not bridge.is_active):
-                                updated_data = {
-                                    "id": j_id,
-                                    "notebookId": active_nb["id"],
-                                    "date": str(edit_date),
-                                    "title": edit_title,
-                                    "content": edit_content,
-                                    "projectId": edit_proj_id,
-                                    "tags": [t.strip() for t in edit_tags.split(",") if t.strip()]
-                                }
-                                if bridge.update_journal(updated_data):
-                                    st.session_state.editing_journal_id = None
-                                    st.success("✅ Сохранено!")
-                                    time.sleep(0.5)
-                                    st.rerun()
-                                else:
-                                    st.error("🔴 Не удалось сохранить запись.")
-
-                        with col_ecancel:
-                            if st.button("❌ Отмена", key=f"cancel_edit_{j_id}", use_container_width=True):
-                                st.session_state.editing_journal_id = None
-                                st.rerun()
                     else:
                         if j_proj_title:
                             st.markdown(f"📁 **Проект**: `{j_proj_title}`")
                         st.markdown("---")
-                        st.markdown(j.get("content", ""))
+                        st.markdown(sanitize_markdown(j.get("content", "")))
+                        if j.get("reflectionQuestions"):
+                            st.markdown(sanitize_markdown(j["reflectionQuestions"]))
+                        if j.get("aiSynthesis"):
+                            st.markdown(sanitize_markdown(j["aiSynthesis"]))
                         st.markdown("---")
                         if j.get("tags"):
                             st.caption(f"🏷️ Теги: {', '.join(j.get('tags', []))}")
@@ -1646,171 +1982,391 @@ elif active_tab == "📖 Журнал":
 # ==================== РАЗДЕЛ 3: ПРОЕКТЫ ====================
 elif active_tab == "📁 Проекты":
     st.markdown("<h2 class='citadel-header'>📁 Управление Проектами</h2>", unsafe_allow_html=True)
-    
-    with st.expander("➕ Создать Новый Проект"):
-        with st.form("new_project_form"):
-            p_title = st.text_input("Название проекта", value="Портал Миссии Шехина")
-            p_cat = st.selectbox("Категория", ["Ministry", "Web Development", "AI System", "Personal"])
-            p_status = st.selectbox("Статус", ["Active", "Planning", "Completed", "Archived"])
-            p_desc = st.text_area("Описание и Цели Проекта")
-            p_milestones = st.text_area("Этапы / Milestones (Markdown)")
-            p_tags = st.text_input("Теги (через запятую)", value="analog, angular, cloudflare")
-            p_submit = st.form_submit_button("🚀 Сохранить Проект", disabled=not bridge.is_active)
-            
-            if p_submit and p_title:
-                proj_data = {
-                    "id": str(uuid.uuid4()),
-                    "title": p_title,
-                    "description": p_desc,
-                    "status": p_status,
-                    "category": p_cat,
-                    "milestones": p_milestones,
-                    "tags": [t.strip() for t in p_tags.split(",") if t.strip()]
-                }
-                if bridge.save_project(proj_data):
-                    st.success("Проект успешно создан!")
-                    st.rerun()
-                else:
-                    st.error("🔴 Не удалось сохранить проект в облачное хранилище.")
+    projects = bridge.load_projects() if bridge.is_active else []
+    with st.expander("➕ Создать новый проект", expanded=not projects):
+        render_record_editor(
+            "project",
+            {"title": "", "description": "", "milestones": "", "category": "Ministry", "status": "Planning", "tags": []},
+            projects,
+            [],
+            "create_project",
+            creating=True,
+        )
 
     st.markdown("---")
-    projects = bridge.load_projects() if bridge.is_active else []
-    
     if projects:
-        cols = st.columns(2)
-        for idx, p in enumerate(projects):
-            with cols[idx % 2]:
-                st.markdown("<div class='citadel-card'>", unsafe_allow_html=True)
-                project_status = str(p.get("status", "Active"))
-                status_class = {
-                    "Active": "badge-active",
-                    "Planning": "badge-planning",
-                    "Completed": "badge-completed",
-                    "Archived": "badge-archived",
-                }.get(project_status, "badge-archived")
-                project_title = html.escape(str(p.get("title", "")))
-                safe_status = html.escape(project_status)
-                st.markdown(f"### {project_title} <span class='{status_class}'>{safe_status}</span>", unsafe_allow_html=True)
-                st.caption(f"📂 Категория: **{p.get('category')}**")
-                st.markdown(p.get("description", ""))
-                if p.get("milestones"):
-                    with st.expander("🎯 Этапы и Milestones"):
-                        st.markdown(p.get("milestones"))
-                if st.button("🗑️ Удалить проект", key=f"del_p_{p.get('id')}", disabled=not bridge.is_active):
-                    if bridge.delete_project(p.get("id")):
-                        st.rerun()
-                    else:
-                        st.error("🔴 Не удалось удалить проект.")
-                st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown(f"### 📁 Проекты ({len(projects)})")
+        for project in projects:
+            project_id = project.get("id", "")
+            with st.expander(f"📁 {project.get('title', 'Без названия')} · {project.get('status', 'Active')}"):
+                if st.session_state.get("editing_project_id") == project_id:
+                    render_record_editor("project", project, projects, [], f"edit_project_{project_id}")
+                else:
+                    st.caption(f"{project.get('category', '—')} · {project.get('startDate') or 'без даты начала'} — {project.get('endDate') or 'без даты окончания'}")
+                    st.markdown(sanitize_markdown(project.get("description", "")))
+                    if project.get("milestones"):
+                        st.markdown("#### Этапы")
+                        st.markdown(sanitize_markdown(project["milestones"]))
+                    if project.get("tags"):
+                        st.caption("🏷️ " + ", ".join(project["tags"]))
+                    edit_col, delete_col = st.columns(2)
+                    with edit_col:
+                        if st.button("✏️ Редактировать свойства", key=f"edit_project_{project_id}"):
+                            st.session_state.editing_project_id = project_id
+                            st.rerun()
+                    with delete_col:
+                        if st.button("🗑️ Удалить проект", key=f"delete_project_{project_id}", disabled=not bridge.is_active):
+                            if bridge.delete_project(project_id):
+                                st.rerun()
+                            else:
+                                st.error("🔴 Не удалось удалить проект.")
     else:
         st.info("Проекты пока не добавлены.")
 
 # ==================== РАЗДЕЛ 4: ЗАМЕТКИ ====================
 elif active_tab == "📝 Заметки":
     st.markdown("<h2 class='citadel-header'>📝 Заметки & База Знаний</h2>", unsafe_allow_html=True)
-    
-    col_n1, col_n2 = st.columns([1, 1])
-    with col_n1:
-        st.markdown("<div class='citadel-card'>", unsafe_allow_html=True)
-        st.markdown("### ✍️ Новая Заметка")
-        n_title = st.text_input("Название заметки", value="Конспект теологии и архитектуры")
-        n_cat = st.selectbox("Категория заметки", ["Theology", "Ministry", "Code", "Ideas", "General"])
-        n_content = st.text_area("Содержимое (Markdown)", height=250, placeholder="Введите текст заметки...")
-        n_tags = st.text_input("Теги", value="теология, исследование")
-        
-        if st.button("💾 Сохранить Заметку", use_container_width=True, disabled=not bridge.is_active):
-            if n_title and n_content:
-                note_data = {
-                    "id": str(uuid.uuid4()),
-                    "title": n_title,
-                    "category": n_cat,
-                    "content": n_content,
-                    "tags": [t.strip() for t in n_tags.split(",") if t.strip()],
-                    "isArchived": False
-                }
-                if bridge.save_note(note_data):
-                    st.success("✅ Заметка сохранена!")
-                    st.rerun()
+    projects = bridge.load_projects() if bridge.is_active else []
+    notes = bridge.load_notes() if bridge.is_active else []
+    with st.expander("➕ Создать заметку", expanded=not notes):
+        render_record_editor(
+            "note",
+            {"title": "", "category": "General", "content": "", "tags": [], "isArchived": False},
+            projects,
+            [],
+            "create_note",
+            creating=True,
+        )
+
+    st.markdown("### 📚 Моя база знаний")
+    if notes:
+        for note in notes:
+            note_id = note.get("id", "")
+            with st.expander(f"📌 [{note.get('category', 'General')}] {note.get('title', 'Без названия')}"):
+                if st.session_state.get("editing_note_id") == note_id:
+                    render_record_editor("note", note, projects, [], f"edit_note_{note_id}")
                 else:
-                    st.error("🔴 Не удалось сохранить заметку в облачное хранилище.")
-        st.markdown("</div>", unsafe_allow_html=True)
-
-    with col_n2:
-        st.markdown("### 📚 Моя База Знаний")
-        notes = bridge.load_notes() if bridge.is_active else []
-        if notes:
-            for n in notes:
-                with st.expander(f"📌 [{n.get('category')}] {n.get('title')}"):
-                    st.markdown(n.get("content"))
-                    if st.button("🗑️ Удалить заметку", key=f"del_n_{n.get('id')}", disabled=not bridge.is_active):
-                        if bridge.delete_note(n.get("id")):
+                    if note.get("projectId"):
+                        project_title = next(
+                            (project.get("title") for project in projects if project.get("id") == note["projectId"]),
+                            "Проект не найден",
+                        )
+                        st.caption(f"📁 {project_title}")
+                    st.caption(f"Временная шкала: {note.get('startDate') or '—'} — {note.get('endDate') or '—'}")
+                    st.markdown(sanitize_markdown(note.get("content", "")))
+                    if note.get("tags"):
+                        st.caption("🏷️ " + ", ".join(note["tags"]))
+                    edit_col, delete_col = st.columns(2)
+                    with edit_col:
+                        if st.button("✏️ Редактировать все свойства", key=f"edit_note_btn_{note_id}"):
+                            st.session_state.editing_note_id = note_id
                             st.rerun()
-                        else:
-                            st.error("🔴 Не удалось удалить заметку.")
-        else:
-            st.info("Заметки отсутствуют.")
+                    with delete_col:
+                        if st.button("🗑️ Удалить заметку", key=f"delete_note_{note_id}", disabled=not bridge.is_active):
+                            if bridge.delete_note(note_id):
+                                st.rerun()
+                            else:
+                                st.error("🔴 Не удалось удалить заметку.")
+    else:
+        st.info("Заметки отсутствуют.")
 
-# ==================== РАЗДЕЛ 5: СЕЙФ КЛЮЧЕЙ ====================
+# ==================== РАЗДЕЛ 5: КАЛЕНДАРЬ ====================
+elif active_tab == "📅 Календарь":
+    st.markdown("<h2 class='citadel-header'>📅 Интерактивный календарь Цитадели</h2>", unsafe_allow_html=True)
+    st.caption("Подсвеченные дни содержат записи или входят в их временную шкалу. Выберите день, чтобы просмотреть, изменить или создать запись.")
+
+    if bridge.is_active:
+        calendar_projects = bridge.load_projects()
+        calendar_notebooks = bridge.load_notebooks()
+        calendar_records = [
+            ("Журнал", "journal", bridge.load_journals()),
+            ("Заметки", "note", bridge.load_notes()),
+            ("Задачи", "task", bridge.load_tasks()),
+            ("Проекты", "project", calendar_projects),
+            ("Сейф", "vault", bridge.load_vault()),
+        ]
+        today = date.today()
+        if "calendar_month" not in st.session_state:
+            st.session_state.calendar_month = date(today.year, today.month, 1)
+        if "calendar_selected_date" not in st.session_state:
+            st.session_state.calendar_selected_date = today
+
+        month_start = st.session_state.calendar_month
+        previous_col, title_col, next_col = st.columns([1, 4, 1])
+        with previous_col:
+            if st.button("← Предыдущий", key="calendar_previous"):
+                year, month = (month_start.year - 1, 12) if month_start.month == 1 else (month_start.year, month_start.month - 1)
+                st.session_state.calendar_month = date(year, month, 1)
+                st.session_state.calendar_selected_date = date(year, month, 1)
+                st.rerun()
+        with title_col:
+            month_names = [
+                "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+                "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь",
+            ]
+            st.markdown(f"<h3 style='text-align:center'>{month_names[month_start.month - 1]} {month_start.year}</h3>", unsafe_allow_html=True)
+        with next_col:
+            if st.button("Следующий →", key="calendar_next"):
+                year, month = (month_start.year + 1, 1) if month_start.month == 12 else (month_start.year, month_start.month + 1)
+                st.session_state.calendar_month = date(year, month, 1)
+                st.session_state.calendar_selected_date = date(year, month, 1)
+                st.rerun()
+
+        with st.container(key="calendar-grid"):
+            weekday_columns = st.columns(7)
+            for column, weekday in zip(weekday_columns, ("Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс")):
+                column.markdown(f"**{weekday}**")
+            for week_index, week in enumerate(month_calendar.monthcalendar(month_start.year, month_start.month)):
+                day_columns = st.columns(7)
+                for column, day_number in zip(day_columns, week):
+                    if day_number == 0:
+                        column.write("")
+                        continue
+                    calendar_day = date(month_start.year, month_start.month, day_number)
+                    matching = [
+                        record
+                        for _, record_type, records in calendar_records
+                        for record in records
+                        if record_matches_date(record_type, record, calendar_day)
+                    ]
+                    is_selected = st.session_state.calendar_selected_date == calendar_day
+                    marker = f" · {len(matching)}" if matching else ""
+                    label = f"{'▶ ' if is_selected else ''}{day_number}{marker}"
+                    if column.button(
+                        label,
+                        key=f"calendar_day_{month_start.year}_{month_start.month}_{day_number}_{week_index}",
+                        type="primary" if matching else "secondary",
+                        use_container_width=True,
+                        help=f"{len(matching)} записей" if matching else "Нет записей",
+                    ):
+                        st.session_state.calendar_selected_date = calendar_day
+                        st.rerun()
+
+        selected_date = st.session_state.calendar_selected_date
+        st.markdown(f"### 📌 Записи за {selected_date.strftime('%d.%m.%Y')}")
+        selected_records = [
+            (section, record_type, record)
+            for section, record_type, records in calendar_records
+            for record in records
+            if record_matches_date(record_type, record, selected_date)
+        ]
+        if selected_records:
+            for section, record_type, record in selected_records:
+                record_id = str(record.get("id", ""))
+                editor_key = (record_type, record_id)
+                with st.expander(f"{section} · {record.get('title', 'Без названия')}"):
+                    if st.session_state.get("calendar_editing_record") == editor_key:
+                        render_record_editor(
+                            record_type,
+                            record,
+                            calendar_projects,
+                            calendar_notebooks,
+                            f"calendar_edit_{record_type}_{record_id}",
+                            default_date=selected_date,
+                            master_passphrase=st.session_state.get("master_passphrase", ""),
+                        )
+                    else:
+                        st.caption(
+                            f"Временная шкала: {record.get('startDate') or '—'} — {record.get('endDate') or '—'}"
+                        )
+                        if record.get("projectId"):
+                            linked_project = next(
+                                (project.get("title") for project in calendar_projects if project.get("id") == record["projectId"]),
+                                "Проект не найден",
+                            )
+                            st.caption(f"📁 Проект: {linked_project}")
+                        if record.get("tags"):
+                            st.caption("🏷️ " + ", ".join(record["tags"]))
+                        if record_type == "journal":
+                            st.caption(f"📓 {record.get('category') or 'Журнал'} · {record.get('date', '')}")
+                            st.markdown(sanitize_markdown(record.get("content", "")))
+                            for extra in ("reflectionQuestions", "aiSynthesis"):
+                                if record.get(extra):
+                                    st.markdown(sanitize_markdown(record[extra]))
+                        elif record_type == "project":
+                            st.caption(f"{record.get('category', '—')} · {record.get('status', '—')}")
+                            st.markdown(sanitize_markdown(record.get("description", "")))
+                            if record.get("milestones"):
+                                st.markdown(sanitize_markdown(record["milestones"]))
+                        elif record_type == "vault":
+                            st.info("🔒 Содержимое секрета не отображается в календаре.")
+                            if record.get("note"):
+                                st.markdown(sanitize_markdown(record["note"]))
+                        else:
+                            st.markdown(sanitize_markdown(record.get("content", record.get("description", ""))))
+
+                        edit_col, delete_col = st.columns(2)
+                        with edit_col:
+                            if st.button("✏️ Редактировать с предпросмотром", key=f"calendar_edit_btn_{record_type}_{record_id}"):
+                                st.session_state.calendar_editing_record = editor_key
+                                st.rerun()
+                        with delete_col:
+                            if st.button("🗑️ Удалить запись", key=f"calendar_delete_{record_type}_{record_id}", disabled=not bridge.is_active):
+                                delete_methods = {
+                                    "journal": bridge.delete_journal,
+                                    "note": bridge.delete_note,
+                                    "task": bridge.delete_task,
+                                    "project": bridge.delete_project,
+                                    "vault": bridge.delete_vault_entry,
+                                }
+                                if delete_methods[record_type](record_id):
+                                    st.session_state.calendar_editing_record = None
+                                    st.rerun()
+                                else:
+                                    st.error("🔴 Не удалось удалить запись.")
+        else:
+            st.info("На выбранную дату записей нет.")
+
+        create_types = {
+            "Журнал": "journal",
+            "Заметка": "note",
+            "Задача": "task",
+            "Проект": "project",
+            "Секрет Сейфа": "vault",
+        }
+        with st.expander("➕ Создать запись для выбранной даты", expanded=False):
+            selected_type = st.selectbox("Раздел записи", list(create_types), key="calendar_create_type")
+            record_type = create_types[selected_type]
+            default_record: Dict[str, Any] = {"title": ""}
+            if record_type == "journal":
+                default_record.update({
+                    "notebookId": calendar_notebooks[0].get("id", "") if calendar_notebooks else "",
+                    "date": str(selected_date),
+                    "category": calendar_notebooks[0].get("title", "Журнал") if calendar_notebooks else "Журнал",
+                    "content": "",
+                    "tags": [],
+                })
+            elif record_type == "note":
+                default_record.update({"category": "General", "content": "", "tags": [], "isArchived": False})
+            elif record_type == "task":
+                default_record.update({"category": "Личное", "description": ""})
+            elif record_type == "project":
+                default_record.update({"category": "Ministry", "status": "Planning", "description": "", "milestones": "", "tags": []})
+            else:
+                default_record.update({"secretType": "API_KEY", "serviceName": "", "note": ""})
+            render_record_editor(
+                record_type,
+                default_record,
+                calendar_projects,
+                calendar_notebooks,
+                f"calendar_create_{record_type}",
+                creating=True,
+                default_date=selected_date,
+                master_passphrase=st.session_state.get("master_passphrase", ""),
+            )
+    else:
+        st.info("Подключитесь к облачному хранилищу, чтобы просматривать и создавать записи в календаре.")
+
+# ==================== РАЗДЕЛ 6: ЗАДАЧИ ====================
+elif active_tab == "📋 Задачи":
+    st.markdown("<h2 class='citadel-header'>📋 Управление Задачами</h2>", unsafe_allow_html=True)
+    st.caption("Прикрепление к проектам, сроки и контроль выполнения")
+    all_projects = bridge.load_projects() if bridge.is_active else []
+    tasks = bridge.load_tasks() if bridge.is_active else []
+    with st.expander("➕ Создать задачу", expanded=not tasks):
+        render_record_editor(
+            "task",
+            {"title": "", "description": "", "category": "Личное"},
+            all_projects,
+            [],
+            "create_task",
+            creating=True,
+        )
+
+    if tasks:
+        st.markdown(f"### 📝 Мои задачи ({len(tasks)})")
+        for task in tasks:
+            task_id = task.get("id", "")
+            with st.expander(f"📋 {task.get('title', 'Без названия')} · {task.get('category', 'Личное')}"):
+                if st.session_state.get("editing_task_id") == task_id:
+                    render_record_editor("task", task, all_projects, [], f"edit_task_{task_id}")
+                else:
+                    st.caption(f"{task.get('startDate') or 'без даты начала'} — {task.get('endDate') or 'без даты окончания'}")
+                    st.markdown(sanitize_markdown(task.get("description", "")))
+                    if task.get("projectId"):
+                        project_title = next(
+                            (project.get("title") for project in all_projects if project.get("id") == task["projectId"]),
+                            "Проект не найден",
+                        )
+                        st.caption(f"📁 {project_title}")
+                    edit_col, delete_col = st.columns(2)
+                    with edit_col:
+                        if st.button("✏️ Редактировать", key=f"edit_task_btn_{task_id}"):
+                            st.session_state.editing_task_id = task_id
+                            st.rerun()
+                    with delete_col:
+                        if st.button("🗑️ Удалить", key=f"delete_task_{task_id}", disabled=not bridge.is_active):
+                            if bridge.delete_task(task_id):
+                                st.rerun()
+                            else:
+                                st.error("🔴 Не удалось удалить задачу.")
+    else:
+        st.info("Задач пока нет. Создайте первую запись выше.")
+
+# ==================== РАЗДЕЛ 7: СЕЙФ КЛЮЧЕЙ ====================
 elif active_tab == "🔐 Сейф Ключей":
     st.markdown("<h2 class='citadel-header'>🔐 Зашифрованный Сейф Ключей и Паролей</h2>", unsafe_allow_html=True)
-    st.caption("Надежное AES-256 хранение API-ключей, токенов, SSH-ключей и паролей")
-    
+    st.caption("Значение секрета остаётся зашифрованным; предпросмотр показывает только публичные заметки.")
     master_pass = st.session_state.get("master_passphrase", "")
-    
-    with st.expander("➕ Добавить Новый Секрет в Сейф"):
-        with st.form("vault_add_form"):
-            v_title = st.text_input("Название (напр., Cloudflare Workers API Token)")
-            v_type = st.selectbox("Тип секрета", ["API_KEY", "TOKEN", "SSH_KEY", "PASSWORD", "OTHER"])
-            v_secret = st.text_input("Значение Секрета (открытый текст)", type="password")
-            v_service = st.text_input("Сервис / Хост", value="Cloudflare / Google AI Studio")
-            v_note = st.text_area("Публичная заметка (без секрета)")
-            
-            v_submit = st.form_submit_button("🔐 Зашифровать и Сохранить", disabled=not bridge.is_active)
-            
-            if v_submit and v_title and v_secret:
-                encrypted_payload = encrypt_secret(v_secret, master_pass)
-                vault_data = {
-                    "id": str(uuid.uuid4()),
-                    "title": v_title,
-                    "secretType": v_type,
-                    "encryptedPayload": encrypted_payload,
-                    "serviceName": v_service,
-                    "note": v_note
-                }
-                if bridge.save_vault_entry(vault_data):
-                    st.success("🔒 Секрет зашифрован и сохранён.")
-                    st.rerun()
-                else:
-                    st.error("🔴 Не удалось сохранить секрет в облачное хранилище.")
-
-    st.markdown("---")
-    st.markdown("### 🔑 Хранимые Секреты")
+    projects = bridge.load_projects() if bridge.is_active else []
     vault_entries = bridge.load_vault() if bridge.is_active else []
-    
+    with st.expander("➕ Добавить секрет в Сейф"):
+        render_record_editor(
+            "vault",
+            {"title": "", "secretType": "API_KEY", "serviceName": "", "note": ""},
+            projects,
+            [],
+            "create_vault",
+            creating=True,
+            master_passphrase=master_pass,
+        )
+
+    st.markdown("### 🔑 Хранимые Секреты")
     if vault_entries:
         for ve in vault_entries:
-            st.markdown("<div class='citadel-card'>", unsafe_allow_html=True)
-            st.markdown(f"#### 🛡️ {ve.get('title')} `[{ve.get('secretType')}]`")
-            if ve.get("serviceName"):
-                st.caption(f"🌐 Сервис: {ve.get('serviceName')}")
-            if ve.get("note"):
-                st.markdown(f"*Заметка: {ve.get('note')}*")
-                
-            col_v1, col_v2 = st.columns([3, 1])
-            with col_v1:
-                show_key = st.checkbox("👁️ Показать зашифрованное значение", key=f"show_{ve.get('id')}")
-                if show_key:
-                    decrypted = decrypt_secret(ve.get("encryptedPayload", ""), master_pass)
-                    st.code(decrypted)
+            entry_id = ve.get("id", "")
+            with st.expander(f"🛡️ {ve.get('title', 'Секрет')} · {ve.get('secretType', 'OTHER')}"):
+                if st.session_state.get("editing_vault_id") == entry_id:
+                    render_record_editor(
+                        "vault",
+                        ve,
+                        projects,
+                        [],
+                        f"edit_vault_{entry_id}",
+                        master_passphrase=master_pass,
+                    )
                 else:
-                    st.code("••••••••••••••••••••••••••••••••••••••••••••••••")
-            with col_v2:
-                if st.button("🗑️ Удалить", key=f"del_v_{ve.get('id')}", disabled=not bridge.is_active):
-                    if bridge.delete_vault_entry(ve.get("id")):
-                        st.rerun()
+                    st.caption(f"🌐 {ve.get('serviceName') or 'Сервис не указан'}")
+                    if ve.get("note"):
+                        st.markdown(sanitize_markdown(ve["note"]))
+                    st.caption(f"📅 {ve.get('startDate') or '—'} — {ve.get('endDate') or '—'}")
+                    if ve.get("projectId"):
+                        project_title = next(
+                            (project.get("title") for project in projects if project.get("id") == ve["projectId"]),
+                            "Проект не найден",
+                        )
+                        st.caption(f"📁 {project_title}")
+                    show_key = st.checkbox("👁️ Показать значение", key=f"show_{entry_id}")
+                    if show_key:
+                        try:
+                            decrypted = decrypt_secret(ve.get("encryptedPayload", ""), master_pass)
+                        except Exception as error:
+                            st.error(f"🔴 Не удалось расшифровать секрет: {error}")
+                        else:
+                            st.code(decrypted)
                     else:
-                        st.error("🔴 Не удалось удалить запись Сейфа.")
-            st.markdown("</div>", unsafe_allow_html=True)
+                        st.code("••••••••••••••••••••••••••••••••••••••••••••••••")
+                    edit_col, delete_col = st.columns(2)
+                    with edit_col:
+                        if st.button("✏️ Редактировать свойства", key=f"edit_vault_{entry_id}"):
+                            st.session_state.editing_vault_id = entry_id
+                            st.rerun()
+                    with delete_col:
+                        if st.button("🗑️ Удалить", key=f"delete_vault_{entry_id}", disabled=not bridge.is_active):
+                            if bridge.delete_vault_entry(entry_id):
+                                st.rerun()
+                            else:
+                                st.error("🔴 Не удалось удалить запись Сейфа.")
     else:
         st.info("В Сейфе пока нет записей.")
 

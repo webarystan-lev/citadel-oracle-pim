@@ -17,6 +17,9 @@ export const createNote = internalMutation({
         content: v.string(),
         tags: v.array(v.string()),
         isArchived: v.boolean(),
+        projectId: v.optional(v.string()),
+        startDate: v.optional(v.string()),
+        endDate: v.optional(v.string()),
     },
     returns: v.any(),
     handler: async (ctx, args) => {
@@ -28,6 +31,9 @@ export const createNote = internalMutation({
             content: args.content,
             tags: args.tags,
             isArchived: args.isArchived,
+            projectId: args.projectId,
+            startDate: args.startDate,
+            endDate: args.endDate,
             createdAt: now,
             updatedAt: now,
         });
@@ -42,6 +48,9 @@ export const updateNote = internalMutation({
         content: v.optional(v.string()),
         tags: v.optional(v.array(v.string())),
         isArchived: v.optional(v.boolean()),
+        projectId: v.optional(v.string()),
+        startDate: v.optional(v.string()),
+        endDate: v.optional(v.string()),
     },
     returns: v.any(),
     handler: async (ctx, args) => {
@@ -58,6 +67,9 @@ export const updateNote = internalMutation({
         if (args.content !== undefined) updateData.content = args.content;
         if (args.tags !== undefined) updateData.tags = args.tags;
         if (args.isArchived !== undefined) updateData.isArchived = args.isArchived;
+        if (args.projectId !== undefined) updateData.projectId = args.projectId;
+        if (args.startDate !== undefined) updateData.startDate = args.startDate;
+        if (args.endDate !== undefined) updateData.endDate = args.endDate;
 
         await ctx.db.patch(existing._id, updateData);
         return existing._id;

@@ -17,6 +17,9 @@ export const createVaultEntry = internalMutation({
         encryptedPayload: v.string(),
         serviceName: v.optional(v.string()),
         note: v.optional(v.string()),
+        projectId: v.optional(v.string()),
+        startDate: v.optional(v.string()),
+        endDate: v.optional(v.string()),
     },
     returns: v.any(),
     handler: async (ctx, args) => {
@@ -28,6 +31,9 @@ export const createVaultEntry = internalMutation({
             encryptedPayload: args.encryptedPayload,
             serviceName: args.serviceName,
             note: args.note,
+            projectId: args.projectId,
+            startDate: args.startDate,
+            endDate: args.endDate,
             createdAt: now,
             updatedAt: now,
         });
@@ -42,6 +48,9 @@ export const updateVaultEntry = internalMutation({
         encryptedPayload: v.optional(v.string()),
         serviceName: v.optional(v.string()),
         note: v.optional(v.string()),
+        projectId: v.optional(v.string()),
+        startDate: v.optional(v.string()),
+        endDate: v.optional(v.string()),
     },
     returns: v.any(),
     handler: async (ctx, args) => {
@@ -58,6 +67,9 @@ export const updateVaultEntry = internalMutation({
         if (args.encryptedPayload !== undefined) updateData.encryptedPayload = args.encryptedPayload;
         if (args.serviceName !== undefined) updateData.serviceName = args.serviceName;
         if (args.note !== undefined) updateData.note = args.note;
+        if (args.projectId !== undefined) updateData.projectId = args.projectId;
+        if (args.startDate !== undefined) updateData.startDate = args.startDate;
+        if (args.endDate !== undefined) updateData.endDate = args.endDate;
 
         await ctx.db.patch(existing._id, updateData);
         return existing._id;

@@ -57,6 +57,12 @@ class TestConvexBridgeFallback(unittest.TestCase):
         self.assertFalse(self.bridge.save_vault_entry({"id": "v-1", "title": "Секрет", "encryptedPayload": "enc"}))
         self.assertFalse(self.bridge.delete_vault_entry("v-1"))
 
+        self.assertEqual(self.bridge.load_tasks(), [])
+        self.assertEqual(self.bridge.load_tasks_by_date("2026-10-16"), [])
+        self.assertFalse(self.bridge.save_task({"id": "t-1", "title": "Задача"}))
+        self.assertFalse(self.bridge.update_task({"id": "t-1"}))
+        self.assertFalse(self.bridge.delete_task("t-1"))
+
 
 class TestConvexBridgeActive(unittest.TestCase):
     """Тестирование CRUD-методов ConvexBridge с активным мокированным клиентом."""
@@ -77,6 +83,8 @@ class TestConvexBridgeActive(unittest.TestCase):
             "projects:listProjects",
             "notes:listNotes",
             "vault:listVaultEntries",
+            "tasks:listTasks",
+            "tasks:listByDate",
         }
 
         def mock_request(operation, args=None):
@@ -203,6 +211,16 @@ class TestConvexBridgeActive(unittest.TestCase):
             "categoryType": "GENERAL"
         })
 
+        updated_notebook = {
+            "id": "nb-1",
+            "title": "Миссия Шехина",
+            "description": "Служение",
+            "icon": "🕊️",
+            "categoryType": "MISSION",
+        }
+        self.assertTrue(self.bridge.update_notebook(updated_notebook))
+        self.mock_client.mutation.assert_called_with("notebooks:updateNotebook", updated_notebook)
+
         self.assertTrue(self.bridge.delete_notebook("nb-1"))
         self.mock_client.mutation.assert_called_with("notebooks:deleteNotebook", {"id": "nb-1"})
 
@@ -222,7 +240,10 @@ class TestConvexBridgeActive(unittest.TestCase):
             "date": "2026-09-06",
             "title": "Рефлексия",
             "content": "Текст",
-            "notebookId": "nb-1"
+            "notebookId": "nb-1",
+            "projectId": "p-1",
+            "startDate": "2026-09-06",
+            "endDate": "2026-09-07",
         }
         self.assertTrue(self.bridge.save_journal(j_data))
         self.mock_client.mutation.assert_called_with("journals:createJournal", {
@@ -232,7 +253,9 @@ class TestConvexBridgeActive(unittest.TestCase):
             "content": "Текст",
             "tags": [],
             "category": "Размышление",
-            "projectId": "",
+            "projectId": "p-1",
+            "startDate": "2026-09-06",
+            "endDate": "2026-09-07",
             "reflectionQuestions": "",
             "aiSynthesis": "",
             "notebookId": "nb-1"
@@ -264,7 +287,9 @@ class TestConvexBridgeActive(unittest.TestCase):
             "status": "Active",
             "category": "Ministry",
             "milestones": "",
-            "tags": []
+            "tags": [],
+            "startDate": "",
+            "endDate": ""
         })
 
         self.assertTrue(self.bridge.delete_project("p-1"))
@@ -289,7 +314,10 @@ class TestConvexBridgeActive(unittest.TestCase):
             "category": "General",
             "content": "Конспект",
             "tags": [],
-            "isArchived": False
+            "isArchived": False,
+            "projectId": "",
+            "startDate": "",
+            "endDate": ""
         })
 
         self.assertTrue(self.bridge.delete_note("n-1"))
@@ -314,11 +342,78 @@ class TestConvexBridgeActive(unittest.TestCase):
             "secretType": "API_KEY",
             "encryptedPayload": "enc_fernet_data",
             "serviceName": "",
-            "note": ""
+            "note": "",
+            "projectId": "",
+            "startDate": "",
+            "endDate": ""
         })
+
+        vault_update = {
+            "id": "v-1",
+            "title": "Updated API Token",
+            "note": "Обновлённая заметка",
+            "projectId": "p-1",
+            "startDate": "2026-10-16",
+            "endDate": "",
+        }
+        self.assertTrue(self.bridge.update_vault_entry(vault_update))
+        self.mock_client.mutation.assert_called_with("vault:updateVaultEntry", vault_update)
 
         self.assertTrue(self.bridge.delete_vault_entry("v-1"))
         self.mock_client.mutation.assert_called_with("vault:deleteVaultEntry", {"id": "v-1"})
+
+    def test_task_crud_and_timeline(self):
+        self.mock_client.query.return_value = [{"id": "t-1", "title": "Подготовить встречу"}]
+        self.assertEqual(self.bridge.load_tasks()[0]["id"], "t-1")
+        self.mock_client.query.assert_called_with("tasks:listTasks")
+
+        self.assertEqual(self.bridge.load_tasks_by_date("2026-10-16")[0]["id"], "t-1")
+        self.mock_client.query.assert_called_with("tasks:listByDate", {"date": "2026-10-16"})
+
+        task = {
+            "id": "t-1",
+            "title": "Подготовить встречу",
+            "description": "**План**",
+            "startDate": "2026-10-16",
+            "endDate": "2026-10-17",
+            "projectId": "p-1",
+            "category": "Миссия",
+        }
+        self.assertTrue(self.bridge.save_task(task))
+        self.mock_client.mutation.assert_called_with("tasks:save", task)
+        self.assertTrue(self.bridge.update_task(task))
+        self.mock_client.mutation.assert_called_with("tasks:update", task)
+        self.assertTrue(self.bridge.delete_task("t-1"))
+        self.mock_client.mutation.assert_called_with("tasks:delete", {"id": "t-1"})
+
+    def test_project_and_note_updates_use_update_routes(self):
+        project = {
+            "id": "p-1",
+            "title": "Миссия",
+            "description": "Описание",
+            "status": "Active",
+            "category": "Ministry",
+            "milestones": "- Первый этап",
+            "tags": ["миссия"],
+            "startDate": "2026-10-01",
+            "endDate": "2026-12-31",
+        }
+        self.assertTrue(self.bridge.update_project(project))
+        self.mock_client.mutation.assert_called_with("projects:updateProject", project)
+
+        note = {
+            "id": "n-1",
+            "title": "Конспект",
+            "category": "Theology",
+            "content": "# Тема",
+            "tags": ["Писание"],
+            "isArchived": False,
+            "projectId": "p-1",
+            "startDate": "2026-10-16",
+            "endDate": "",
+        }
+        self.assertTrue(self.bridge.update_note(note))
+        self.mock_client.mutation.assert_called_with("notes:updateNote", note)
 
 
 class TestConvexBridgeHttpGateway(unittest.TestCase):

@@ -45,6 +45,8 @@ export default defineSchema({
         tags: v.array(v.string()),       // Теги записи (напр., ["благодать", "миссия"])
         category: v.optional(v.string()), // Категория записи
         projectId: v.optional(v.string()), // UUID привязанного проекта
+        startDate: v.optional(v.string()), // Начало временной шкалы (YYYY-MM-DD)
+        endDate: v.optional(v.string()),   // Конец временной шкалы (YYYY-MM-DD)
         reflectionQuestions: v.optional(v.string()), // Вопросы от ИИ
         aiSynthesis: v.optional(v.string()),         // ИИ-выводы
         createdAt: v.float64(),
@@ -60,6 +62,8 @@ export default defineSchema({
         category: v.string(),            // "Ministry", "Web Development", "AI System", "Personal"
         milestones: v.optional(v.string()), // JSON или Markdown этапные цели
         tags: v.array(v.string()),
+        startDate: v.optional(v.string()),
+        endDate: v.optional(v.string()),
         createdAt: v.float64(),
         updatedAt: v.float64(),
     }).index("by_uuid", ["id"]).index("by_status", ["status"]),
@@ -72,6 +76,9 @@ export default defineSchema({
         content: v.string(),             // Содержимое Markdown
         tags: v.array(v.string()),
         isArchived: v.boolean(),
+        projectId: v.optional(v.string()),
+        startDate: v.optional(v.string()),
+        endDate: v.optional(v.string()),
         createdAt: v.float64(),
         updatedAt: v.float64(),
     }).index("by_uuid", ["id"]).index("by_category", ["category"]),
@@ -84,7 +91,23 @@ export default defineSchema({
         encryptedPayload: v.string(),    // Зашифрованные данные (AES-256 base64)
         serviceName: v.optional(v.string()), // Имя сервиса/хоста (напр., "Google AI Studio")
         note: v.optional(v.string()),    // Публичное примечание (не содержит секрет)
+        projectId: v.optional(v.string()),
+        startDate: v.optional(v.string()),
+        endDate: v.optional(v.string()),
         createdAt: v.float64(),
         updatedAt: v.float64(),
     }).index("by_uuid", ["id"]).index("by_secretType", ["secretType"]),
+
+    // 📋 Таблица «Задачи»
+    tasks: defineTable({
+        id: v.string(),                  // UUID задачи
+        title: v.string(),               // Название задачи
+        description: v.optional(v.string()), // Описание задачи
+        startDate: v.optional(v.string()), // Дата начала (YYYY-MM-DD)
+        endDate: v.optional(v.string()),   // Дата завершения (YYYY-MM-DD); пустое значение — без срока
+        projectId: v.optional(v.string()), // UUID привязанного проекта
+        category: v.string(),            // Категория ("Разработка", "Миссия", "Семья", "Теология", "Личное")
+        createdAt: v.float64(),
+        updatedAt: v.float64(),
+    }).index("by_uuid", ["id"]).index("by_projectId", ["projectId"]),
 });

@@ -81,6 +81,9 @@ const pimApi = httpAction(async (ctx, request) => {
             case "notebooks:createNotebook":
                 result = await ctx.runMutation(internal.notebooks.createNotebook, gatewayArgs<typeof internal.notebooks.createNotebook>(args));
                 break;
+            case "notebooks:updateNotebook":
+                result = await ctx.runMutation(internal.notebooks.updateNotebook, gatewayArgs<typeof internal.notebooks.updateNotebook>(args));
+                break;
             case "notebooks:deleteNotebook":
                 result = await ctx.runMutation(internal.notebooks.deleteNotebook, gatewayArgs<typeof internal.notebooks.deleteNotebook>(args));
                 break;
@@ -105,6 +108,9 @@ const pimApi = httpAction(async (ctx, request) => {
             case "projects:createProject":
                 result = await ctx.runMutation(internal.projects.createProject, gatewayArgs<typeof internal.projects.createProject>(args));
                 break;
+            case "projects:updateProject":
+                result = await ctx.runMutation(internal.projects.updateProject, gatewayArgs<typeof internal.projects.updateProject>(args));
+                break;
             case "projects:deleteProject":
                 result = await ctx.runMutation(internal.projects.deleteProject, gatewayArgs<typeof internal.projects.deleteProject>(args));
                 break;
@@ -114,14 +120,35 @@ const pimApi = httpAction(async (ctx, request) => {
             case "notes:createNote":
                 result = await ctx.runMutation(internal.notes.createNote, gatewayArgs<typeof internal.notes.createNote>(args));
                 break;
+            case "notes:updateNote":
+                result = await ctx.runMutation(internal.notes.updateNote, gatewayArgs<typeof internal.notes.updateNote>(args));
+                break;
             case "notes:deleteNote":
                 result = await ctx.runMutation(internal.notes.deleteNote, gatewayArgs<typeof internal.notes.deleteNote>(args));
+                break;
+            case "tasks:listTasks":
+                result = await ctx.runQuery(internal.tasks.listTasks, {});
+                break;
+            case "tasks:save":
+                result = await ctx.runMutation(internal.tasks.save, gatewayArgs<typeof internal.tasks.save>(args));
+                break;
+            case "tasks:update":
+                result = await ctx.runMutation(internal.tasks.update, gatewayArgs<typeof internal.tasks.update>(args));
+                break;
+            case "tasks:delete":
+                result = await ctx.runMutation(internal.tasks.deleteTask, gatewayArgs<typeof internal.tasks.deleteTask>(args));
+                break;
+            case "tasks:listByDate":
+                result = await ctx.runQuery(internal.tasks.listByDate, gatewayArgs<typeof internal.tasks.listByDate>(args));
                 break;
             case "vault:listVaultEntries":
                 result = await ctx.runQuery(internal.vault.listVaultEntries, {});
                 break;
             case "vault:createVaultEntry":
                 result = await ctx.runMutation(internal.vault.createVaultEntry, gatewayArgs<typeof internal.vault.createVaultEntry>(args));
+                break;
+            case "vault:updateVaultEntry":
+                result = await ctx.runMutation(internal.vault.updateVaultEntry, gatewayArgs<typeof internal.vault.updateVaultEntry>(args));
                 break;
             case "vault:deleteVaultEntry":
                 result = await ctx.runMutation(internal.vault.deleteVaultEntry, gatewayArgs<typeof internal.vault.deleteVaultEntry>(args));

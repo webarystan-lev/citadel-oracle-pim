@@ -127,3 +127,30 @@ export const deleteNotebook = internalMutation({
         return false;
     },
 });
+
+export const updateNotebook = internalMutation({
+    args: {
+        id: v.string(),
+        title: v.optional(v.string()),
+        description: v.optional(v.string()),
+        icon: v.optional(v.string()),
+        categoryType: v.optional(v.string()),
+    },
+    returns: v.any(),
+    handler: async (ctx, args) => {
+        const existing = await ctx.db
+            .query("notebooks")
+            .withIndex("by_uuid", (q) => q.eq("id", args.id))
+            .first();
+        if (!existing) return null;
+
+        const updateData: Record<string, unknown> = { updatedAt: Date.now() };
+        if (args.title !== undefined) updateData.title = args.title;
+        if (args.description !== undefined) updateData.description = args.description;
+        if (args.icon !== undefined) updateData.icon = args.icon;
+        if (args.categoryType !== undefined) updateData.categoryType = args.categoryType;
+
+        await ctx.db.patch(existing._id, updateData);
+        return existing._id;
+    },
+});

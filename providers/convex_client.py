@@ -246,6 +246,22 @@ class ConvexBridge:
             logger.error(f"🔴 Ошибка notebooks:deleteNotebook: {str(e)}")
             return False
 
+    def update_notebook(self, notebook_data: Dict[str, Any]) -> bool:
+        if not self.is_active or not self.client:
+            return False
+        try:
+            self._request("notebooks:updateNotebook", {
+                "id": notebook_data["id"],
+                "title": notebook_data["title"],
+                "description": notebook_data.get("description", ""),
+                "icon": notebook_data.get("icon", "📓"),
+                "categoryType": notebook_data.get("categoryType", "GENERAL")
+            })
+            return True
+        except Exception as e:
+            logger.error(f"🔴 Ошибка notebooks:updateNotebook: {str(e)}")
+            return False
+
     # ==================== ЗАПИСИ ЖУРНАЛОВ (JOURNALS) ====================
     def load_journals(self) -> List[Dict[str, Any]]:
         if not self.is_active or not self.client:
@@ -279,6 +295,8 @@ class ConvexBridge:
                 "tags": journal_data.get("tags", []),
                 "category": journal_data.get("category", "Размышление"),
                 "projectId": journal_data.get("projectId", ""),
+                "startDate": journal_data.get("startDate", ""),
+                "endDate": journal_data.get("endDate", ""),
                 "reflectionQuestions": journal_data.get("reflectionQuestions", ""),
                 "aiSynthesis": journal_data.get("aiSynthesis", "")
             }
@@ -303,6 +321,8 @@ class ConvexBridge:
             if "tags" in journal_data: payload["tags"] = journal_data["tags"]
             if "category" in journal_data: payload["category"] = journal_data["category"]
             if "projectId" in journal_data: payload["projectId"] = journal_data["projectId"]
+            if "startDate" in journal_data: payload["startDate"] = journal_data["startDate"]
+            if "endDate" in journal_data: payload["endDate"] = journal_data["endDate"]
             if "reflectionQuestions" in journal_data: payload["reflectionQuestions"] = journal_data["reflectionQuestions"]
             if "aiSynthesis" in journal_data: payload["aiSynthesis"] = journal_data["aiSynthesis"]
 
@@ -343,11 +363,33 @@ class ConvexBridge:
                 "status": project_data.get("status", "Active"),
                 "category": project_data.get("category", "Ministry"),
                 "milestones": project_data.get("milestones", ""),
-                "tags": project_data.get("tags", [])
+                "tags": project_data.get("tags", []),
+                "startDate": project_data.get("startDate", ""),
+                "endDate": project_data.get("endDate", "")
             })
             return True
         except Exception as e:
             logger.error(f"🔴 Ошибка projects:createProject: {str(e)}")
+            return False
+
+    def update_project(self, project_data: Dict[str, Any]) -> bool:
+        if not self.is_active or not self.client:
+            return False
+        try:
+            self._request("projects:updateProject", {
+                "id": project_data["id"],
+                "title": project_data["title"],
+                "description": project_data["description"],
+                "status": project_data.get("status", "Active"),
+                "category": project_data.get("category", "Ministry"),
+                "milestones": project_data.get("milestones", ""),
+                "tags": project_data.get("tags", []),
+                "startDate": project_data.get("startDate", ""),
+                "endDate": project_data.get("endDate", "")
+            })
+            return True
+        except Exception as e:
+            logger.error(f"🔴 Ошибка projects:updateProject: {str(e)}")
             return False
 
     def delete_project(self, project_id: str) -> bool:
@@ -380,11 +422,34 @@ class ConvexBridge:
                 "category": note_data.get("category", "General"),
                 "content": note_data["content"],
                 "tags": note_data.get("tags", []),
-                "isArchived": note_data.get("isArchived", False)
+                "isArchived": note_data.get("isArchived", False),
+                "projectId": note_data.get("projectId", ""),
+                "startDate": note_data.get("startDate", ""),
+                "endDate": note_data.get("endDate", "")
             })
             return True
         except Exception as e:
             logger.error(f"🔴 Ошибка notes:createNote: {str(e)}")
+            return False
+
+    def update_note(self, note_data: Dict[str, Any]) -> bool:
+        if not self.is_active or not self.client:
+            return False
+        try:
+            self._request("notes:updateNote", {
+                "id": note_data["id"],
+                "title": note_data["title"],
+                "category": note_data.get("category", "General"),
+                "content": note_data["content"],
+                "tags": note_data.get("tags", []),
+                "isArchived": note_data.get("isArchived", False),
+                "projectId": note_data.get("projectId", ""),
+                "startDate": note_data.get("startDate", ""),
+                "endDate": note_data.get("endDate", "")
+            })
+            return True
+        except Exception as e:
+            logger.error(f"🔴 Ошибка notes:updateNote: {str(e)}")
             return False
 
     def delete_note(self, note_id: str) -> bool:
@@ -417,11 +482,89 @@ class ConvexBridge:
                 "secretType": vault_data.get("secretType", "API_KEY"),
                 "encryptedPayload": vault_data["encryptedPayload"],
                 "serviceName": vault_data.get("serviceName", ""),
-                "note": vault_data.get("note", "")
+                "note": vault_data.get("note", ""),
+                "projectId": vault_data.get("projectId", ""),
+                "startDate": vault_data.get("startDate", ""),
+                "endDate": vault_data.get("endDate", "")
             })
             return True
         except Exception as e:
             logger.error(f"🔴 Ошибка vault:createVaultEntry: {str(e)}")
+            return False
+
+    def update_vault_entry(self, vault_data: Dict[str, Any]) -> bool:
+        if not self.is_active or not self.client:
+            return False
+        try:
+            payload = {"id": vault_data["id"]}
+            for key in ("title", "secretType", "encryptedPayload", "serviceName", "note", "projectId", "startDate", "endDate"):
+                if key in vault_data:
+                    payload[key] = vault_data[key]
+            self._request("vault:updateVaultEntry", payload)
+            return True
+        except Exception as e:
+            logger.error(f"🔴 Ошибка vault:updateVaultEntry: {str(e)}")
+            return False
+
+    # ==================== ЗАДАЧИ (TASKS) ====================
+    def load_tasks(self) -> List[Dict[str, Any]]:
+        if not self.is_active or not self.client:
+            return []
+        try:
+            return self._request("tasks:listTasks")
+        except Exception as e:
+            logger.error(f"🔴 Ошибка tasks:listTasks: {str(e)}")
+            return []
+
+    def load_tasks_by_date(self, date_str: str) -> List[Dict[str, Any]]:
+        if not self.is_active or not self.client:
+            return []
+        try:
+            return self._request("tasks:listByDate", {"date": date_str})
+        except Exception as e:
+            logger.error(f"🔴 Ошибка tasks:listByDate: {str(e)}")
+            return []
+
+    def save_task(self, task_data: Dict[str, Any]) -> bool:
+        if not self.is_active or not self.client:
+            return False
+        try:
+            self._request("tasks:save", {
+                "id": task_data["id"],
+                "title": task_data["title"],
+                "description": task_data.get("description", ""),
+                "startDate": task_data.get("startDate", ""),
+                "endDate": task_data.get("endDate", ""),
+                "projectId": task_data.get("projectId", ""),
+                "category": task_data.get("category", "Личное")
+            })
+            return True
+        except Exception as e:
+            logger.error(f"🔴 Ошибка tasks:save: {str(e)}")
+            return False
+
+    def update_task(self, task_data: Dict[str, Any]) -> bool:
+        if not self.is_active or not self.client:
+            return False
+        try:
+            payload = {"id": task_data["id"]}
+            for key in ("title", "description", "startDate", "endDate", "projectId", "category"):
+                if key in task_data:
+                    payload[key] = task_data[key]
+            self._request("tasks:update", payload)
+            return True
+        except Exception as e:
+            logger.error(f"🔴 Ошибка tasks:update: {str(e)}")
+            return False
+
+    def delete_task(self, task_id: str) -> bool:
+        if not self.is_active or not self.client:
+            return False
+        try:
+            self._request("tasks:delete", {"id": task_id})
+            return True
+        except Exception as e:
+            logger.error(f"🔴 Ошибка tasks:delete: {str(e)}")
             return False
 
     def delete_vault_entry(self, entry_id: str) -> bool:

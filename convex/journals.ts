@@ -31,6 +31,8 @@ export const createJournal = internalMutation({
         tags: v.array(v.string()),
         category: v.optional(v.string()),
         projectId: v.optional(v.string()),
+        startDate: v.optional(v.string()),
+        endDate: v.optional(v.string()),
         reflectionQuestions: v.optional(v.string()),
         aiSynthesis: v.optional(v.string()),
     },
@@ -46,6 +48,8 @@ export const createJournal = internalMutation({
             tags: args.tags,
             category: args.category,
             projectId: args.projectId,
+            startDate: args.startDate,
+            endDate: args.endDate,
             reflectionQuestions: args.reflectionQuestions,
             aiSynthesis: args.aiSynthesis,
             createdAt: now,
@@ -64,6 +68,8 @@ export const updateJournal = internalMutation({
         tags: v.optional(v.array(v.string())),
         category: v.optional(v.string()),
         projectId: v.optional(v.string()),
+        startDate: v.optional(v.string()),
+        endDate: v.optional(v.string()),
         reflectionQuestions: v.optional(v.string()),
         aiSynthesis: v.optional(v.string()),
     },
@@ -84,6 +90,8 @@ export const updateJournal = internalMutation({
         if (args.tags !== undefined) updateData.tags = args.tags;
         if (args.category !== undefined) updateData.category = args.category;
         if (args.projectId !== undefined) updateData.projectId = args.projectId;
+        if (args.startDate !== undefined) updateData.startDate = args.startDate;
+        if (args.endDate !== undefined) updateData.endDate = args.endDate;
         if (args.reflectionQuestions !== undefined) updateData.reflectionQuestions = args.reflectionQuestions;
         if (args.aiSynthesis !== undefined) updateData.aiSynthesis = args.aiSynthesis;
 
